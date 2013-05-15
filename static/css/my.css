@@ -1,0 +1,22 @@
+.time{
+      font-size:10px;  
+}
+      body {
+        padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
+      }
+  
+      #right_part{
+	/*  float: left;
+	  width: 600px;
+	  margin-left:1em;*/
+	  margin-top:2em;
+	     margin-left: 7em;
+	    width: 800px;
+      
+      }
+      div.right{
+	float:right
+      }
+      div.left{
+	float:left
+      }

@@ -1,0 +1,12 @@
+{application, prolog_open_api,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { prolog_open_api_app, []}},
+  {env, []}
+ ]}.

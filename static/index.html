@@ -1,0 +1,108 @@
+<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>Fraud Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+   
+    
+    <!-- Le styles -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="css/bootstrap-responsive.css" rel="stylesheet">
+    <link href="css/my.css" rel="stylesheet">
+
+    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="../assets/js/html5shiv.js"></script>
+    <![endif]-->
+
+
+  </head>
+
+  <body>
+  <div class="container"  >
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+      <div class="container"  >
+          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+          </button>
+          <a class="brand" href="#">Fraud Interface</a>
+          <div id="menu" style='display:none'> 
+          <div class="nav-collapse collapse" style='float:left' >
+            <ul class="nav">
+            <a class="btn btn-success pull-right greenbtn" href="javascript:fraud_queue()">Очередь </a>
+            </ul>
+          </div>
+          <div class="nav-collapse collapse" style='float:left' >
+            <ul class="nav">
+            <a class="btn btn-success pull-right greenbtn" href="javascript:fraud_next()">Получить следующий </a>
+            </ul>
+          </div>
+	  <div class="nav-collapse collapse" style='float:left' >
+            <ul class="nav">
+            <a class="btn btn-success pull-right greenbtn" href="javascript:fraud_finished()">Обработаные</a>
+            </ul>
+          </div>
+          
+	  </div>
+	  
+	  <div class="nav-collapse collapse" style='float:right' >
+            <ul class="nav">
+<!--	    <button class="btn  pull-right greenbtn" id='authorizeButton' href="javascript:startRealtime()"> Sig in via Google</button> -->
+	    </ul>
+          </div>
+      
+   
+   
+        </div>
+        </div>
+      </div>          
+
+    
+   <div id='login' >
+      <h3>Login</h3>
+      
+      <label>Имя пользователя:</label>
+      <input class="span3" type="text" id='login' placeholder="login">
+      <label>Пароль:</label>
+      <input class="span3" type="text" id='password' placeholder="password"><br/>
+      <a class="btn btn-success pull-left greenbtn" href="javascript:login()">Войти</a>
+      
+   </div>
+    <div id='queue' style='display:none'>
+      <h4>Ваши запросы :</h4>
+      
+     
+      
+   </div>
+  
+  
+  
+      
+      
+      
+    </div>
+
+
+     
+
+      
+
+    <!-- /container -->
+
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/jquery1.9.1.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script type="text/javascript" src='js/simple_que.js' ></script>
+
+
+
+</body>
+</html>
