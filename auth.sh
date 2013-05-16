@@ -1,0 +1,9 @@
+#!/bin/sh
+
+curl     http://127.0.0.1:8313/prolog/auth/p24
+
+#curl -d"data={\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"login\":\"none2\",\"password\":\"bezumie\",\"user_ip\":\"127.0.0.1\",\"email\":\"perldev@mail.ru\"}"    http://127.0.0.1:8086/api/registration/new
+
+#curl  -d"data={\"widget_id\":408287,\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"email\":\"perldev@mail.ru\",\"category\":5}"    http://127.0.0.1:8086/api/registration/update
+
+

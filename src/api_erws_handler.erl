@@ -4,6 +4,8 @@
 -import(lists, [foldl/3,foreach/2]).
 
 -include("open_api.hrl").
+-include("deps/eprolog/include/prolog.hrl").
+
 -compile(export_all).
 
 % Behaviour cowboy_http_handler
@@ -32,23 +34,23 @@ handle(Req, State) ->
 
 
 	
-start_link_session( Session, TreeEts, SourceMsg)->
-        Pid = spawn_link(?MODULE, start_shell_process, [ TreeEts, Session ]),
+start_link_session( Session, TreeEts, SourceMsg, NameSpace)->
+        Pid = spawn_link(?MODULE, start_shell_process, [ TreeEts, Session, NameSpace ]),
         [  ] = ets:lookup(?ERWS_LINK, Session), %%do not use one session
         [_Name | Args] = tuple_to_list(SourceMsg),
         ets:insert(?ERWS_LINK,{ Session, Pid, wait, list_to_tuple(Args), now() } ),       
 	Pid.
 	
 	
-start_new_aim(Msg) when is_tuple(Msg)->
+start_new_aim(Msg, NameSpace) when is_tuple(Msg)->
     Key = generate_session(),
     TreeEts = list_to_atom(  Key  ),  
     %TODO make key from server
     NewSession = generate_session(), 
-    start_link_session(NewSession, TreeEts, Msg), 
+    start_link_session(NewSession, TreeEts, Msg, NameSpace), 
     process_req(NewSession, Msg ),
     jsx:encode([{status,<<"ok">>},{session, list_to_binary(NewSession) }]);
-start_new_aim(error)->
+start_new_aim(error, _NameSpace)->
     jsx:encode([{status,<<"fail">>},{ description, <<"i can't parse params">> } ]).
 
 
@@ -121,6 +123,10 @@ generate_http_resp(aim_in_process, Req)->
     Response  = jsx:encode([{status,<<"wait">>},{ description, <<"this aim in process">> } ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req);	
+generate_http_resp(permissions_denied, Req)->
+    Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">> } ]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
+					Response, Req);	
 generate_http_resp(not_found, Req)->
     Response  = jsx:encode([{status,<<"fail">>},{ description, <<"not found">> } ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
@@ -135,34 +141,59 @@ generate_http_resp(Json, Req)->
 
 
     
-api_handle([<<"create">>, Aim], Req, _) ->
+api_handle_command([ <<"create">>, NameSpace, Aim], Req) ->
     ?API_LOG("~n New client ~p",[Req]),
     Msg =  generate_prolog_msg(Req, Aim),
     ?API_LOG("~n generate aim ~p",[Msg]),
-    Response = start_new_aim(Msg),
+    Response = start_new_aim(Msg, binary_to_list(NameSpace) ),
     ?API_LOG("~nsend to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req)
 ;
 
-api_handle([<<"process">>, Session], Req, _) ->
+api_handle_command([<<"process">>, _NameSpace, Session], Req) ->
     ?API_LOG("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?API_LOG(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session) ),
     generate_http_resp(Result, Req)
      
 ;
-api_handle([<<"finish">>, Session], Req, _ ) ->
+api_handle_command([<<"finish">>, _NameSpace, Session], Req ) ->
     ?API_LOG("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?API_LOG(" Req: ~p ~n", [Req]),
      generate_http_resp( delete_session( binary_to_list(Session)), Req )
 ;
-api_handle([<<"next">>, Session], Req, _ ) ->
+api_handle_command([<<"next">>, _NameSpace, Session], Req) ->
     ?API_LOG("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
     ?API_LOG(" Req: ~p ~n", [Req]),
      Result  = aim_next(binary_to_list( Session) ),
      generate_http_resp(Result, Req)
 ;
+api_handle_command(Path, Req) ->
+    ?API_LOG(" Req: ~p ~n", [{Path, Req}]),
+     generate_http_resp(not_found, Req)
+.
+
+api_handle([<<"auth">>, NameSpace], Req, _ ) ->
+    ?API_LOG(" Req: ~p ~n", [Req]),
+    { {Ip,_}, Req1} = cowboy_req:peer(Req),
+     generate_http_resp( auth_demon:auth(Ip , NameSpace), Req1 )
+;
+api_handle([<<"stop_auth">>, NameSpace], Req, _ ) ->
+    ?API_LOG(" Req: ~p ~n", [Req]),
+   { {Ip,_}, Req1} = cowboy_req:peer(Req),
+     generate_http_resp(auth_demon:deauth(Ip ,NameSpace), Req1)
+;
+
+api_handle(Path = [_Cmd, NameSpace, _Something], Req, _ ) ->
+    ?API_LOG(" Req: ~p ~n", [Req]),
+    { {Ip,_}, Req1} = cowboy_req:peer(Req),
+    case auth_demon:check_auth(Ip, NameSpace ) of
+	false -> generate_http_resp(permissions_denied, Req1);
+	true  ->  api_handle_command(Path, Req)
+    end
+;
+
 api_handle(Path, Req, _ ) ->
     ?API_LOG(" Req: ~p ~n", [{Path, Req}]),
      generate_http_resp(not_found, Req)
@@ -209,8 +240,9 @@ process_req(Session, Msg)->
       end
 .
 
-start_shell_process(TreeEts, Session)->
+start_shell_process(TreeEts, Session, NameSpace)->
       ets:new(TreeEts,[ public, set, named_table ] ),
+      ets:insert(TreeEts, {?PREFIX, NameSpace}),
       shell_loop(TreeEts, Session).
 
 shell_loop(TreeEts, Back) ->
@@ -251,6 +283,7 @@ store_result(Session ,R) ->
 
 clean(Tree)->
       ets:delete(Tree,'next' ),
+      ets:delete(Tree,?PREFIX ),
       ets:foldl(
 	  fun( {_Index, {Pid, _Some} }, _ )->
 	      case  Pid of
@@ -351,10 +384,9 @@ get_help()->
 server_loop(ParseGoal, TreeEts, WebPid) ->
     process_flag(trap_exit, true),
     ?API_LOG(" get aim ~p",[ParseGoal]),
+    %TODO measure time
     {_,T,T1} = now(),
-    %%TODO multi user kernel
-    GlobalTempAim = list_to_atom( atom_to_list(?TEMP_SHELL_AIM)++ integer_to_list(T) ++ integer_to_list(T1) ),
-
+    
     case ParseGoal  of
 	listing ->  
 		WebPid ! {result, prolog_shell:get_code_memory_html(), finish, self() }
@@ -372,9 +404,7 @@ server_loop(ParseGoal, TreeEts, WebPid) ->
 	      process_prove_erws(TempAim, Goal, BackPid, WebPid, StartTime );
          _Goal ->
 		WebPid ! {result, unexpected, finish, self() }
-    end,
-    ?API_LOG("delete temp ~p ~n",[TreeEts]),
-    ets:delete(?RULES, GlobalTempAim )
+    end
 .
 
 web_parse_code(P0)->
@@ -382,7 +412,7 @@ web_parse_code(P0)->
     erlog_parse:term(Terms).
 
 process_prove_erws(TempAim , Goal, BackPid, WebPid,  StartTime)->
-%       ProtoType = common:my_delete_element(1, Goal),
+%TODO measure time
       receive 
 	    {'EXIT',FromPid,Reason}->
  		  ?API_LOG(" ~p exit aim ~p~n",[?LINE,FromPid]),
@@ -420,17 +450,7 @@ process_prove_erws(TempAim , Goal, BackPid, WebPid,  StartTime)->
 
 	    {result, {Result, SomeContext} }->
    		   ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {Result,  Goal, SomeContext} ]),
-% 		  FinishTime = erlang:now(),
-% 		  NewLocalContext = prolog:fill_context( 
-% 					Result, 
-% 					ProtoType,
-% 					dict:new() ), 
-					
-% 		  ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {WebPid, Result,  ProtoType, NewLocalContext} ]),
-% 		  VarsRes = lists:map(fun shell_var_match_str/1, dict:to_list(NewLocalContext) ),
-% 		  ElapsedTime = time_string(FinishTime, StartTime),
-%   		  ResStr = io_lib:format("Yes looking next ?",[] ),
-% 		  Main =  concat_result( [VarsRes, ResStr, ElapsedTime] ),
+
 		  
 		  WebPid ! {result, Result, has_next, self() },
  		  receive 
