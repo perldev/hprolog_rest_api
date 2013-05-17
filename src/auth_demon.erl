@@ -3,7 +3,7 @@
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1 ]).
--export([auth/2, deauth/2, low_auth/3, try_auth/3, low_stop_auth/3,check_auth/2]).
+-export([auth/2, deauth/2, low_auth/3, try_auth/3, low_stop_auth/3,check_auth/2, cache_connections/0]).
 
 
 
@@ -26,14 +26,48 @@ init([]) ->
 	  ?LOG_START,
 	  Auth = ets:new( auth_info, [named_table ,public ,set ] ),
 	  ets:insert(Auth, ?AUTH_LIST ),
-         { ok, #monitor{
-		      registered_namespaces = ets:new( registered_namespaces, [named_table ,public ,set ] ),
-		      registered_ip = ets:new( registered_ip, [named_table ,public ,set ] ),
+	  {NameSpace, Registered} = load_tables(),
+	  timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
+          { ok, #monitor{
+		      registered_namespaces = NameSpace,
+		      registered_ip = Registered,
 		      auth_info = Auth,
 		      proc_table = ets:new( proc_table, [named_table ,public ,set ] )
-		  
-	       } }
+		      } 
+	  }
 .
+%%cach auth information
+load_tables()->
+        Registered = case catch 
+			  ets:file2tab(?REGISTERED_FILE) of
+			{ok, Tab} -> Tab;	
+			 _ -> 
+			       ets:new( registered_namespaces, [named_table ,public ,set ] )
+		    end,
+	NameSpace = case catch 
+			  ets:file2tab(?REGISTERED_NAMESPACE) of
+			{ok, Tab2} -> 
+			      ets:foldl(fun({NameSpaceName, _Time}, In)->  
+					     ?AUTH_LOG("load namespace ~p ~n",
+					      [ NameSpaceName]),
+					    prolog_shell:api_start(NameSpaceName),
+					    ets:insert(Tab2,  {NameSpaceName , now() }),
+					    [NameSpaceName|In]
+					 end,[], Tab2),
+			      Tab2;	
+			 _ -> 
+			       ets:new( registered_ip, [named_table ,public ,set ] )
+		    end,
+     {NameSpace, Registered}
+.
+
+
+sync_with_disc(State)->
+      ets:tab2file(State#monitor.registered_namespaces, ?REGISTERED_NAMESPACE ),
+      ets:tab2file(State#monitor.registered_ip, ?REGISTERED_FILE ).
+      
+
+
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -94,10 +128,10 @@ start_namespace(State, NameSpace, Ip)->
 	  EtsRegis = State#monitor.registered_ip,
   	  EtsNameSpace = State#monitor.registered_namespaces,
 	  ets:insert(EtsRegis, { {NameSpace, Ip} , now() }),
-	  prolog_shell:api_start(NameSpace),
 	  case ets:lookup(EtsNameSpace,NameSpace ) of
 		[] -> 
-		    ets:insert(EtsNameSpace,  {EtsNameSpace , now() }),
+		    prolog_shell:api_start(NameSpace),
+		    ets:insert(EtsNameSpace,  {NameSpace , now() }),
 		    true;
 		_->true
 	  end
@@ -111,6 +145,9 @@ low_stop_auth(State,  Ip, NameSpace)->
 stop() ->
     gen_server:cast(?MODULE, stop).
     
+handle_cast(cache_connections, MyState)->
+    sync_with_disc(MyState),
+    {noreply, MyState};
 handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
 	  %TODO reloading various namespaces
 	  low_stop_auth(MyState,Ip, NameSpace ),
@@ -145,7 +182,6 @@ handle_cast( { regis,  Pid }, MyState) ->
  	?AUTH_LOG("~p start monitor ~p ~n",
                            [ { ?MODULE, ?LINE }, Pid ]),
          erlang:monitor( process, Pid ),
-%          ets:insert(MyState#monitor.proc_table, {Pid, watch}),
          {noreply, MyState}.
 % ----------------------------------------------------------------------------------------------------------
 % Function: handle_info(Info, State) -> {noreply, State} | {noreply, State, Timeout} | {stop, Reason, State}
@@ -198,7 +234,6 @@ deauth(Ip, NameSpace )->
   gen_server:cast(?MODULE,{deauth, Ip, NameSpace}).
 
 
-%TODO RELACE IT
 
 check_auth(Ip, NameSpace) when is_binary(NameSpace)->
   check_auth(Ip, binary_to_list(NameSpace));
@@ -207,7 +242,9 @@ check_auth(Ip, NameSpace)->
     gen_server:call(?MODULE,{check_auth, Ip, NameSpace})
 .
 
-
+cache_connections()->
+  gen_server:cast(?MODULE,cache_connections).
+  
     
 regis_timer_restart(Pid)->
     gen_server:cast(?MODULE,{regis_timer_restart, Pid}).

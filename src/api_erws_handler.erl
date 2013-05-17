@@ -8,7 +8,6 @@
 
 -compile(export_all).
 
-% Behaviour cowboy_http_handler
 
 
 % Behaviour cowboy_http_handler
@@ -349,9 +348,12 @@ process_params(Aim, List)->
 generate_prolog_msg(Req, Aim)->
     {ok, PostVals, _Req2} = cowboy_req:body_qs(Req),
     Post = proplists:get_value(<<"params">>, PostVals,undefined),
+    ?API_LOG("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
+
     Json  = ( catch jsx:decode(Post) ),
-%     jsx:decode(<<"[1,{\"name\":1}]">>).
-% [1,[{<<"name">>,1}]]
+    ?API_LOG("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
+%    jsx:decode(<<"[1,{\"name\":1}]">>).
+%    [1,[{<<"name">>,1}]]
     case Json of
 	{'EXIT', _ } -> error;
 	List when is_list(List)->
@@ -416,42 +418,27 @@ process_prove_erws(TempAim , Goal, BackPid, WebPid,  StartTime)->
       receive 
 	    {'EXIT',FromPid,Reason}->
  		  ?API_LOG(" ~p exit aim ~p~n",[?LINE,FromPid]),
-% 		  MainRes = io_lib:format("No",[]),
-% 		  FinishTime = erlang:now(),
-% 		  ElapsedTime = time_string(FinishTime, StartTime ), 
-% 		  Main =  concat_result( [MainRes,ElapsedTime] ),
-% 		  ?LOG("~p send back restul to web console ~p",[{?MODULE,?LINE},{Main, WebPid}]),
+
 		  WebPid ! {result, false, finish, self() },
 		  finish_web_session();
 		
 	    finish ->
-% 		   MainRes = io_lib:format("No",[]),
-% 		   FinishTime = erlang:now(),
-%     		   ElapsedTime = time_string(FinishTime, StartTime),
-%     		   Main =  concat_result( [MainRes,ElapsedTime] ),
+
 		   WebPid ! {result, false, finish, self() },
 		   finish_web_session();
 
 	    {result, {false, _ } }->
-% 		   MainRes = io_lib:format("No",[]),
-% 		   FinishTime = erlang:now(),
-%      		  ElapsedTime = time_string(FinishTime, StartTime),
-%      		   Main =  concat_result( [MainRes,ElapsedTime] ),
+
 		   WebPid ! {result, false, finish, self() },
 		   finish_web_session();
 
 	    {result, {empty, _ } }->
-% 		   MainRes = io_lib:format("No",[]),
-% 		   FinishTime = erlang:now(),
-%     		   ElapsedTime = time_string(FinishTime, StartTime),
-%     		   Main =  concat_result( [MainRes,ElapsedTime] ),
+
 		   WebPid ! {result, false, finish, self() },
 		   finish_web_session();
 
 	    {result, {Result, SomeContext} }->
-   		   ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {Result,  Goal, SomeContext} ]),
-
-		  
+   		  ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {Result,  Goal, SomeContext} ]),		  
 		  WebPid ! {result, Result, has_next, self() },
  		  receive 
 			{Line, NewWebPid} ->
