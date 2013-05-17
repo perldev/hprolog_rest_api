@@ -10,7 +10,7 @@ HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin  erl-prolog/ebin/ "
 #DOTTED=` | grep '\.'`
 TYPE="name"
  
-ERL="erl +A 4 +K true" #-config siteheart"
+ERL="erl +A 4 +K true -Q 10000000 +P 500000 -env  ERL_MAX_ETS_TABLES 10000" #-config siteheart"
 
 start()
 {
