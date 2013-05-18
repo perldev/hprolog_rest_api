@@ -149,7 +149,6 @@ api_handle_command([ <<"create">>, NameSpace, Aim], Req) ->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req)
 ;
-
 api_handle_command([<<"process">>, _NameSpace, Session], Req) ->
     ?API_LOG("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?API_LOG(" Req: ~p ~n", [Req]),
@@ -388,7 +387,7 @@ server_loop(ParseGoal, TreeEts, WebPid) ->
     ?API_LOG(" get aim ~p",[ParseGoal]),
     %TODO measure time
     {_,T,T1} = now(),
-    
+
     case ParseGoal  of
 	listing ->  
 		WebPid ! {result, prolog_shell:get_code_memory_html(), finish, self() }
@@ -421,17 +420,12 @@ process_prove_erws(TempAim , Goal, BackPid, WebPid,  StartTime)->
 
 		  WebPid ! {result, false, finish, self() },
 		  finish_web_session();
-		
 	    finish ->
-
 		   WebPid ! {result, false, finish, self() },
 		   finish_web_session();
-
 	    {result, {false, _ } }->
-
 		   WebPid ! {result, false, finish, self() },
 		   finish_web_session();
-
 	    {result, {empty, _ } }->
 
 		   WebPid ! {result, false, finish, self() },
@@ -459,7 +453,7 @@ generate_session()->
     {MSecs, Secs, MiSecs} = erlang:now(),
     %this is not the perfect fast procedure but it work in thread cause this
     % im do not want to rewrite it 
-    Res = lists:flatten( io_lib:format("~.36B~p~.36Be",[ MSecs, Secs, MiSecs ]) ), %reference has only 14 symbols
+    Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[ MSecs, Secs, MiSecs ]) ), %reference has only 14 symbols
     Res
 .
 
