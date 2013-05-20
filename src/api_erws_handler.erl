@@ -33,8 +33,8 @@ handle(Req, State) ->
 
 
 	
-start_link_session( Session, TreeEts, SourceMsg, NameSpace)->
-        Pid = spawn_link(?MODULE, start_shell_process, [ TreeEts, Session, NameSpace ]),
+start_link_session( Session, SourceMsg, NameSpace)->
+        Pid = spawn_link(?MODULE, start_shell_process, [  Session, NameSpace ]),
         [  ] = ets:lookup(?ERWS_LINK, Session), %%do not use one session
         [_Name | Args] = tuple_to_list(SourceMsg),
         ets:insert(?ERWS_LINK,{ Session, Pid, wait, list_to_tuple(Args), now() } ),       
@@ -42,11 +42,9 @@ start_link_session( Session, TreeEts, SourceMsg, NameSpace)->
 	
 	
 start_new_aim(Msg, NameSpace) when is_tuple(Msg)->
-    Key = generate_session(),
-    TreeEts = list_to_atom(  Key  ),  
     %TODO make key from server
     NewSession = generate_session(), 
-    start_link_session(NewSession, TreeEts, Msg, NameSpace), 
+    start_link_session(NewSession, Msg, NameSpace), 
     process_req(NewSession, Msg ),
     jsx:encode([{status,<<"ok">>},{session, list_to_binary(NewSession) }]);
 start_new_aim(error, _NameSpace)->
@@ -238,10 +236,10 @@ process_req(Session, Msg)->
       end
 .
 
-start_shell_process(TreeEts, Session, NameSpace)->
-      ets:new(TreeEts,[ public, set, named_table ] ),
-      ets:insert(TreeEts, {?PREFIX, NameSpace}),
-      shell_loop(TreeEts, Session).
+start_shell_process( Session, NameSpace)->
+      NewTree = ets:new(treeEts,[ public, set ] ),
+      ets:insert(NewTree, {?PREFIX, NameSpace}),
+      shell_loop(NewTree, Session).
 
 shell_loop(TreeEts, Back) ->
     %%REWRITE it like trace
