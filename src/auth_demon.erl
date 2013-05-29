@@ -6,13 +6,11 @@
 -export([auth/2, deauth/2, low_auth/3, try_auth/3, low_stop_auth/3,check_auth/2, cache_connections/0]).
 
 
-
 -record(monitor,{
 		  registered_namespaces,
 		  registered_ip,
 		  auth_info,
-		  proc_table
-		  
+		  proc_table		  
                 }
                 ).
 -include("open_api.hrl").
@@ -73,8 +71,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 handle_call( {auth, Ip, NameSpace }, _From ,State) ->
-    ?AUTH_LOG("try auth with  ~p ~n",
-                           [{Ip, NameSpace}]),
+    ?AUTH_LOG("try auth with  ~p ~n", [{auth, Ip, NameSpace }] ),
     Res =  try_auth(Ip, NameSpace, State  ),
     {reply, Res ,State}
 ;

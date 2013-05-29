@@ -94,7 +94,7 @@ get_result(Session)->
 					dict:new() ), 
 		  ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext} ]),
 		  VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext) ),
-		  jsx:encode(VarsRes)
+		  jsx:encode( [ {status, true}, {result, VarsRes } ] )
     end
 		  
 .
@@ -151,6 +151,7 @@ api_handle_command([<<"process">>, _NameSpace, Session], Req) ->
     ?API_LOG("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?API_LOG(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session) ),
+    
     generate_http_resp(Result, Req)
      
 ;
@@ -330,8 +331,8 @@ proc_object([ { <<"name">>, Name } ] )->
 process_json_params(E) when is_list(E)->
 	  proc_object(E)
 ;
-process_json_params(E) ->
-	  E
+process_json_params(E) when is_binary(E)->
+	  binary_to_list(E)
 .
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
