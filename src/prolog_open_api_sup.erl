@@ -8,14 +8,12 @@ start_link() ->
         supervisor:start_link({local, ?MODULE}, ?MODULE, []).  
       
 init([]) ->  
-	Restarter = {
-           "monitor",
-           { converter_monitor, start_link, [  ] },
-           permanent, infinity, worker , [ converter_monitor ]
-        },
-        AuthDemon = {
-	    "auth_demon",
-           { auth_demon, start_link, [  ] },
-           permanent, infinity, worker , [ auth_demon ]
-        },
-        {ok, { {one_for_one, 5, 10}, [Restarter, AuthDemon] } }.  
+	Restarter = {"monitor",
+        {converter_monitor, start_link, []},
+        permanent, infinity, worker , [ converter_monitor ]
+    },
+    AuthDemon = {"auth_demon",
+        {auth_demon, start_link, [] },
+        permanent, infinity, worker , [ auth_demon ]
+    },
+    {ok, {{one_for_one, 5, 10}, [Restarter, AuthDemon]}}.  

@@ -1,8 +1,6 @@
 #!/bin/sh
 
-#curl -d "params=[{\"name\":\"X\"}, {\"name\":\"Y\"}]"   http://localhost:8313/prolog/create/predecessor
-
-curl http://localhost:8313/prolog/process/p24/$1
+curl http://localhost:8313/prolog/reload/p24/$1
 
 #curl -d"data={\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"login\":\"none2\",\"password\":\"bezumie\",\"user_ip\":\"127.0.0.1\",\"email\":\"perldev@mail.ru\"}"    http://127.0.0.1:8086/api/registration/new
 

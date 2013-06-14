@@ -21,7 +21,6 @@ start_link() ->
 	  
 %%TODO name spaces
 init([]) ->
-	  ?LOG_START,
 	  Auth = ets:new( auth_info, [named_table ,public ,set ] ),
 	  ets:insert(Auth, ?AUTH_LIST ),
 	  {NameSpace, Registered} = load_tables(),
@@ -31,9 +30,7 @@ init([]) ->
 		      registered_ip = Registered,
 		      auth_info = Auth,
 		      proc_table = ets:new( proc_table, [named_table ,public ,set ] )
-		      } 
-	  }
-.
+	}}.
 %%cach auth information
 load_tables()->
         Registered = case catch 
@@ -46,10 +43,10 @@ load_tables()->
 			  ets:file2tab(?REGISTERED_NAMESPACE) of
 			{ok, Tab2} -> 
 			      ets:foldl(fun({NameSpaceName, _Time}, In)->  
-					     ?AUTH_LOG("load namespace ~p ~n",
+					     ?LOG_DEBUG("load namespace ~p ~n",
 					      [ NameSpaceName]),
 					    prolog_shell:api_start(NameSpaceName),
-					    ets:insert(Tab2,  {NameSpaceName , now() }),
+					    ets:insert(Tab2, {NameSpaceName, now()}),
 					    [NameSpaceName|In]
 					 end,[], Tab2),
 			      Tab2;	
@@ -71,12 +68,12 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 handle_call( {auth, Ip, NameSpace }, _From ,State) ->
-    ?AUTH_LOG("try auth with  ~p ~n", [{auth, Ip, NameSpace }] ),
+    ?LOG_DEBUG("try auth with  ~p ~n", [{auth, Ip, NameSpace }] ),
     Res =  try_auth(Ip, NameSpace, State  ),
     {reply, Res ,State}
 ;
 handle_call({check_auth, Ip, NameSpace }, _From ,State) ->
-    ?AUTH_LOG("check auth ~p ~n",
+    ?LOG_DEBUG("check auth ~p ~n",
                            [{Ip, NameSpace}]),
 
     EtsRegis = State#monitor.registered_ip,
@@ -89,7 +86,7 @@ handle_call({check_auth, Ip, NameSpace }, _From ,State) ->
 ;
 
 handle_call(Info,_From ,State) ->
-    ?AUTH_LOG("get msg call ~p ~n",
+    ?LOG_DEBUG("get msg call ~p ~n",
                            [Info]),
     {reply,nothing ,State}
 .
@@ -151,7 +148,7 @@ handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
          {noreply, MyState};
     
 % handle_cast( { regis_timer_restart,  Pid }, MyState) ->
-%  	 ?AUTH_LOG("~p start monitor ~p ~n",
+%  	 ?LOG_DEBUG("~p start monitor ~p ~n",
 %                            [ { ?MODULE, ?LINE }, Pid ]),
 %          erlang:monitor( process,Pid ),
 %          timer:apply_after(?RESTART_CONVERTER,
@@ -162,21 +159,21 @@ handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
 %    
 %          {noreply, MyState};
 % handle_cast( { kill_process_after,  Pid }, MyState) ->
-%  	?AUTH_LOG("~p start monitor ~p ~n",
+%  	?LOG_DEBUG("~p start monitor ~p ~n",
 %                            [ { ?MODULE, ?LINE }, Pid ]),
 % 	 %demonitor(Pid),
 %          erlang:exit(Pid, by_timer),
 %          ets:delete(MyState#monitor.proc_table, Pid),
 %          {noreply, MyState};
 % handle_cast( { regis,  Pid, Description }, MyState) ->
-%  	?AUTH_LOG("~p start monitor ~p ~n",
+%  	?LOG_DEBUG("~p start monitor ~p ~n",
 %                            [ { ?MODULE, ?LINE }, Pid ]),
 %          erlang:monitor( process, Pid ),
 %          ets:insert(MyState#monitor.proc_table, { Pid, Description }),
 %          {noreply, MyState};
 %          
 handle_cast( { regis,  Pid }, MyState) ->
- 	?AUTH_LOG("~p start monitor ~p ~n",
+ 	?LOG_DEBUG("~p start monitor ~p ~n",
                            [ { ?MODULE, ?LINE }, Pid ]),
          erlang:monitor( process, Pid ),
          {noreply, MyState}.
@@ -194,7 +191,7 @@ kill_process_after(Pid)->
 
 handle_info({'DOWN',_,_,Pid,Reason}, State)->
        
-       ?AUTH_LOG("~p process  msg ~p  ~n",
+       ?LOG_DEBUG("~p process  msg ~p  ~n",
                            [ {?MODULE,?LINE}, { Pid,Reason } ]),
        
        ets:delete(State#monitor.proc_table, Pid),
@@ -202,7 +199,7 @@ handle_info({'DOWN',_,_,Pid,Reason}, State)->
        {noreply,  State}
 ;
 handle_info(Info, State) ->
-    ?AUTH_LOG("get msg  unregistered msg ~p ~n",
+    ?LOG_DEBUG("get msg  unregistered msg ~p ~n",
                            [Info]),
 
     {noreply,  State}.
