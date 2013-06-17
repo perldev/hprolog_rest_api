@@ -98,7 +98,6 @@ handle_call(Info,_From ,State) ->
 try_auth(Ip, NameSpace, State)->
       Ets = State#monitor.registered_namespaces,
       EtsRegis = State#monitor.registered_ip,
-    
       case ets:lookup(Ets, NameSpace ) of
 	  [_]-> %already registered
 	        case ets:lookup(EtsRegis, { NameSpace, Ip } ) of 
