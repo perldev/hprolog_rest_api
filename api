@@ -11,7 +11,9 @@ HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin  erl-prolog/ebin/ "
 TYPE="name"
  
 ERL="erl +A 4 +K true -Q 10000000 +P 500000 -env  ERL_MAX_ETS_TABLES 10000" #-config siteheart"
-
+#-sname dev \
+#   -config sys \
+#       -s prolog_open_api
 start()
 {
 	echo "starting Erlang visor Server"
@@ -22,11 +24,12 @@ start()
 	-noinput -detached \
 	-boot start_sasl \
 	-s $APP  \
+	-config sys \
 	-$TYPE $NODE@$HOST
 }
 start_debug(){
 	echo "starting debug"
-	$ERL    $HOME_P  -s $APP  -kernel error_logger false    -boot start_sasl  -$TYPE debug_$NODE@$HOST
+	$ERL    $HOME_P  -s $APP  -kernel error_logger false  -config sys  -boot start_sasl  -$TYPE debug_$NODE@$HOST
 
 
 }
