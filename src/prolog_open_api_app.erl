@@ -9,7 +9,9 @@
 
 start(_StartType, _StartArgs) ->
     start_listener(),
-    %{ok, _} = timer:apply_interval(10000, prolog_open_api_app, check_memory, []),  
+    %{ok, _} = timer:apply_interval(10000, prolog_open_api_app, check_memory, []),
+    ets:new(?QUEUE_TABLE, [named_table, public, set]),
+    timer:apply_interval(1000, prolog_open_api_queue, processed_queue, []),  
     prolog_open_api_sup:start_link().  
     
 stop(_State) ->  
@@ -28,11 +30,11 @@ start_listener() ->
 						{<<".js">>, [<<"application/javascript">>]}]
 				      }
 				]}]}
-		]),
+	]),
 	{ok, _} = cowboy:start_http(http, ?COUNT_LISTENERS, [{port, ?WORK_PORT}],
 	[{env, [{dispatch, Dispatch}]}]).
 
 check_memory() ->
     L = [{Key, round(Value/1048576)} || {Key, Value} <- erlang:memory()],
     ?LOG_INFO("Statistic use memory esmsd: ~p~n", [L]).
-  
+

@@ -1,8 +1,6 @@
-
 %% LAGER MACROS
 -define(WEB_REQS(Format, Args),
     lager:info(Format, Args)).
-
 
 -define(LOG_DEBUG(Format, Args),
     lager:debug(Format, Args)).
@@ -27,13 +25,5 @@
 -define(REGISTERED_FILE, "registered.ets" ).
 -define(REGISTERED_NAMESPACE, "namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
+-define(QUEUE_TABLE, queue_table).
 
--define(AUTH_LIST,
-		[ 
-	       { { {127,0,0,1},  "p24"}, yes  },
-	       { { {127,0,0,1},  ""}, yes  },
-	       { { {127,0,0,1},  "test_namespace"}, yes },
-	       { { {10,1,214,15},  "p24"}, yes  },
-	       { { {10,1,214,15},  "p24error"}, yes  }
-	       ]
-).

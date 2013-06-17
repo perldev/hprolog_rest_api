@@ -1,6 +1,6 @@
 #!/bin/sh
 
-curl http://localhost:8313/prolog/reload/p24/$1
+curl http://localhost:8313/prolog/reload/test_namespace/
 
 #curl -d"data={\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"login\":\"none2\",\"password\":\"bezumie\",\"user_ip\":\"127.0.0.1\",\"email\":\"perldev@mail.ru\"}"    http://127.0.0.1:8086/api/registration/new
 
