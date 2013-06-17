@@ -8,8 +8,6 @@
 
 -compile(export_all).
 
-
-
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
 
@@ -23,23 +21,19 @@ terminate(_Req, _State, _T) ->
 
 handle(Req, State) ->
      { Path, Req1} = cowboy_req:path_info(Req),
-     ?API_LOG("Request: ~p~n", [Path]),
+     ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
-     ?API_LOG("~n~p Got : ~p~n", [?LINE, Result]),
+     ?LOG_DEBUG("Line: ~n~p Got : ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-     {ok, NewReq, State}
-.
+     {ok, NewReq, State}.
 
-
-
-	
 start_link_session( Session, SourceMsg, NameSpace)->
         Pid = spawn(?MODULE, start_shell_process, [  Session, NameSpace ]),
         [  ] = ets:lookup(?ERWS_LINK, Session), %%do not use one session
         [_Name | Args] = tuple_to_list(SourceMsg),
-        ets:insert(?ERWS_LINK,{ Session, Pid, wait, list_to_tuple(Args), now() } ),       
+        ets:insert(?ERWS_LINK,{ Session, Pid, wait, SourceMsg, now() } ),       
+
 	Pid.
-	
 	
 start_new_aim(Msg, NameSpace) when is_tuple(Msg)->
     %TODO make key from server
@@ -48,38 +42,35 @@ start_new_aim(Msg, NameSpace) when is_tuple(Msg)->
     process_req(NewSession, Msg ),
     jsx:encode([{status,<<"true">>},{session, list_to_binary(NewSession) }]);
 start_new_aim(error, _NameSpace)->
-    jsx:encode([{status,<<"fail">>},{ description, <<"i can't parse params">> } ]).
+    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]).
 
 
-api_var_match({ { Key }, Val} ) when is_tuple(Val)->
-         { Key, list_to_binary( io_lib:format("~p",[Val]) )  };
-api_var_match({ { Key }, Val} ) when is_float(Val)->
-        {  Key , list_to_binary( float_to_list(Val) ) };
-api_var_match({ { Key }, Val} ) when is_integer(Val)->
-	 { Key , list_to_binary( integer_to_list(Val) ) }; 
-api_var_match({ { Key }, Val} ) when is_list(Val) -> 
-			    case catch( unicode:characters_to_binary(Val) ) of
-				  {'EXIT', _ }->
-					{Key,  list_to_binary( io_lib:format("~p",[Val]) ) };
-				  SomeThing ->
-					{Key, SomeThing}
-			    end;		    
-api_var_match({ { Key }, []} )-> 
-    {Key, <<"">>  }
-;
-api_var_match({ { Key }, Val} ) when is_atom(Val)-> 
-   {Key, [ {<<"atom">>, list_to_binary( atom_to_list(Val) ) } ] }  
-;
-api_var_match({ { Key }, Val} )-> 
-   {Key, Val}  
-.
+api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
+    {Key, list_to_binary( io_lib:format("~p",[Val]))};
+api_var_match({{ Key }, Val} ) when is_float(Val)->
+    {Key , list_to_binary( float_to_list(Val))};
+api_var_match({{ Key }, Val} ) when is_integer(Val)->
+	{Key , list_to_binary( integer_to_list(Val) )}; 
+api_var_match({{ Key }, Val} ) when is_list(Val) -> 
+	case catch( unicode:characters_to_binary(Val)) of
+		{'EXIT', _ }->
+		    {Key,  list_to_binary( io_lib:format("~p",[Val]) ) };
+		SomeThing ->
+			{Key, SomeThing}
+	end;		    
+api_var_match({ { Key }, []})->
+    {Key, <<"">>};
+api_var_match({ { Key }, Val}) when is_atom(Val)-> 
+   {Key, [ {<<"atom">>, list_to_binary( atom_to_list(Val))}]};
+api_var_match({ { Key }, Val}) -> 
+   {Key, Val}.
 
 get_result(Session)->
     case ets:lookup(?ERWS_LINK, Session) of 
 	[]->   session_finished;
-	[{_, _Pid, wait, _ProtoType, _Time  } ]->
+	[{_, _Pid, wait, _ProtoType, _Time  }]->
 		result_not_ready;
-	[{_, Pid, false, _ProtoType, _Time  } ]->
+	[{_, Pid, false, _ProtoType, _Time  }]->
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		false;
@@ -88,16 +79,11 @@ get_result(Session)->
 		exit(Pid, finish),
 		unexpected_error;	
 	[{_,_,SomeThing, ProtoType, _Time  } ]-> 
-	        NewLocalContext = prolog:fill_context( 
-					SomeThing, 
-					ProtoType,
-					dict:new() ), 
-		  ?API_LOG("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext} ]),
+                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
+		  ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
 		  VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext) ),
-		  jsx:encode( [ {status, true}, {result, VarsRes } ] )
-    end
-		  
-.
+		  jsx:encode( [ {status, true}, {result, VarsRes}])
+    end.
 
 
 generate_http_resp(session_finished, Req)->
@@ -121,7 +107,7 @@ generate_http_resp(aim_in_process, Req)->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req);	
 generate_http_resp(permissions_denied, Req)->
-    Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">> } ]),
+    Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">> }]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req);	
 generate_http_resp(not_found, Req)->
@@ -129,103 +115,107 @@ generate_http_resp(not_found, Req)->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req);		
 generate_http_resp(true, Req)->
-    Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">> } ]),
+    Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">>}]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req);	
 generate_http_resp(Json, Req)->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Json, Req).
 
-
-    
+api_handle_command([<<"reload">>, BinNameS], Req) ->
+    ?LOG_INFO("Reload: ~p~n", [Req]),
+    NameSpace = binary_to_list(BinNameS),
+    Res = case fact_hbase:check_exist_table(NameSpace ++ ?META_FACTS) of
+        false ->  
+            fact_hbase:create_new_meta_table(NameSpace ++ ?META_FACTS),
+		    fact_hbase:create_new_fact_table(NameSpace ++ ?RULES_TABLE),
+		    <<"ok">>;
+        true ->
+            prolog:delete_inner_structs(NameSpace),
+            fact_hbase:load_rules2ets(NameSpace),   %%?
+            <<"ok">>;
+        _ ->
+            <<"fail">>
+    end,
+    Resp = jsx:encode([{status,Res}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
 api_handle_command([ <<"create">>, NameSpace, Aim], Req) ->
     ?API_LOG("~n New client ~p",[Req]),
     Msg =  generate_prolog_msg(Req, Aim),
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, binary_to_list(NameSpace) ),
-    ?API_LOG("~nsend to client ~p",[Response]),
+    ?LOG_INFO("~nsend to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 					Response, Req)
 ;
-api_handle_command([<<"process">>, _NameSpace, Session], Req) ->
-    ?WEB_REQS("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
-    ?API_LOG(" Req: ~p ~n", [Req]),
-    Result  = get_result( binary_to_list(Session) ),
-    
-    generate_http_resp(Result, Req)
-     
-;
+api_handle_command([<<"process">>, _NameSpace, Session], Req) ->    %%TODO
+    ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
+    ?LOG_INFO(" Req: ~p ~n", [Req]),
+    Result  = get_result( binary_to_list(Session)),
+    generate_http_resp(Result, Req);
 api_handle_command([<<"finish">>, _NameSpace, Session], Req ) ->
-    ?WEB_REQS("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
-    ?API_LOG(" Req: ~p ~n", [Req]),
-     generate_http_resp( delete_session( binary_to_list(Session)), Req )
-;
+    ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
+    ?LOG_INFO(" Req: ~p ~n", [Req]),
+     generate_http_resp( delete_session(binary_to_list(Session)), Req);
 api_handle_command([<<"next">>, _NameSpace, Session], Req) ->
-    ?WEB_REQS("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
-    ?API_LOG(" Req: ~p ~n", [Req]),
+    ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
+    ?LOG_INFO(" Req: ~p ~n", [Req]),
      Result  = aim_next(binary_to_list( Session) ),
-     generate_http_resp(Result, Req)
-;
+     generate_http_resp(Result, Req);
 api_handle_command(Path, Req) ->
-    ?API_LOG(" Req: ~p ~n", [{Path, Req}]),
-     generate_http_resp(not_found, Req)
-.
-
-api_handle([<<"auth">>, NameSpace], Req, _ ) ->
-    ?API_LOG(" Req: ~p ~n", [Req]),
+    ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
+     generate_http_resp(not_found, Req).
+api_handle([<<"auth">>, NameSpace], Req, _) ->
+    ?LOG_INFO("authReq: ~p ~n", [Req]),
     { {Ip,_}, Req1} = cowboy_req:peer(Req),
-     generate_http_resp( auth_demon:auth(Ip , NameSpace), Req1 )
-;
-api_handle([<<"stop_auth">>, NameSpace], Req, _ ) ->
-    ?API_LOG(" Req: ~p ~n", [Req]),
-   { {Ip,_}, Req1} = cowboy_req:peer(Req),
-     generate_http_resp(auth_demon:deauth(Ip ,NameSpace), Req1)
-;
-
-api_handle(Path = [_Cmd, NameSpace, _Something], Req, _ ) ->
-    ?API_LOG(" Req: ~p ~n", [Req]),
-    { {Ip,_}, Req1} = cowboy_req:peer(Req),
-    case auth_demon:check_auth(Ip, NameSpace ) of
+    generate_http_resp(auth_demon:auth(Ip , NameSpace), Req1);
+api_handle([<<"stop_auth">>, NameSpace], Req, _) ->
+    ?LOG_INFO("Req: ~p ~n", [Req]),
+    {{Ip,_}, Req1} = cowboy_req:peer(Req),
+    generate_http_resp(auth_demon:deauth(Ip, NameSpace), Req1);
+api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
+    ?LOG_INFO("Reload namespace: ~p~n", [NameSpace]),
+    {{Ip,_}, Req1} = cowboy_req:peer(Req),
+    case auth_demon:check_auth(Ip, NameSpace) of
 	false -> generate_http_resp(permissions_denied, Req1);
-	true  ->  api_handle_command(Path, Req)
-    end
-;
-
-api_handle(Path, Req, _ ) ->
-    ?API_LOG(" Req: ~p ~n", [{Path, Req}]),
-     generate_http_resp(not_found, Req)
-.
-
+	true  -> api_handle_command(Path, Req)
+    end;
+api_handle(Path = [Cmd, NameSpace, _Something], Req, _ ) ->
+    ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p~n", [Req, NameSpace, Cmd]),
+    {{Ip,_}, Req1} = cowboy_req:peer(Req),
+    case auth_demon:check_auth(Ip, NameSpace) of
+	false -> generate_http_resp(permissions_denied, Req1);
+	true  -> api_handle_command(Path, Req)
+    end;
+api_handle(Path, Req, _) ->
+    ?LOG_WARNING("Path: ~p Req: ~p~n", [{Path, Req}]),
+     generate_http_resp(not_found, Req).
 
 aim_next(Session)->
-      case ets:lookup(?ERWS_LINK, Session) of
-	  [ {Session, _Pid, wait, _ProtoType,_StartTime} ]->
-	      aim_in_process;
-	  [ {Session, _Pid, Res, _ProtoType,_StartTime} ] when is_atom(Res) ->
-	      delete_session(Session),
-	      Res;
-	  [ {Session, Pid, Res, ProtoType, StartTime} ] when is_tuple(Res) ->
-	      Pid ! {some_code, next},
-	      ets:insert(?ERWS_LINK, {Session, Pid, wait, ProtoType, StartTime} ),
-	      true;
-	  []->
-	      not_found
-		
-      end.
+    case ets:lookup(?ERWS_LINK, Session) of
+	    [{Session, _Pid, wait, _ProtoType,_StartTime} ]->
+	        aim_in_process;
+	    [{Session, _Pid, Res, _ProtoType,_StartTime} ] when is_atom(Res) ->
+	        delete_session(Session),
+	        Res;
+	    [{Session, Pid, Res, ProtoType, StartTime} ] when is_tuple(Res) ->
+	        Pid ! {some_code, next},
+	        ets:insert(?ERWS_LINK, {Session, Pid, wait, ProtoType, StartTime}),
+	        true;
+	    []->
+	        not_found
+    end.
 
- 
-delete_session(Session)->
-      case ets:lookup(?ERWS_LINK, Session) of
-	  [ {Session, Pid, _Status, _ProtoType,_StartTime} ]->
-	      ets:delete(?ERWS_LINK, Session ),
-	      Pid ! {some_code, finish} ,
-	      true;
-	  []->
-		?API_LOG("~p exception ~p",[{?MODULE,?LINE},Session  ]),
-		not_found
-		
-      end
-.
+delete_session(Session) ->
+    case ets:lookup(?ERWS_LINK, Session) of
+	    [{Session, Pid, _Status, _ProtoType, _StartTime} ]->
+	        ets:delete(?ERWS_LINK, Session),
+	        Pid ! {some_code, finish} ,
+	        true;
+	    []->
+		    ?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session  ]),
+		    not_found
+	end.
  
 process_req(Session, Msg)->
       case ets:lookup(?ERWS_LINK, Session) of
@@ -237,158 +227,137 @@ process_req(Session, Msg)->
       end
 .
 
-start_shell_process( Session, NameSpace)->
-      NewTree = ets:new(treeEts,[ public, set ] ),
-      ets:insert(NewTree, {?PREFIX, NameSpace}),      
-      shell_loop(start, NewTree, Session).
+%%TODO rework
+start_shell_process(Session, NameSpace)->
+    NewTree = ets:new(treeEts,[ public, set, { keypos, 2 } ]),
+    ets:insert(NewTree, {system_record, ?PREFIX, NameSpace}),
+    shell_loop(start, NewTree, Session).
 
       
-shell_loop(finish, TreeEts, Back) ->
+
+ 
+shell_loop(start, TreeEts, Back) ->
+            %%REWRITE it like trace
+	    receive 
+		  {some_code, Back, Goal}->	  
+			  ?API_LOG("~p wait new aim from user ~p",[{?MODULE,?LINE}, {self(),Goal} ]),
+			  {TempAim, _ShellContext } =  prolog_shell:make_temp_aim(Goal), 
+                         ?LOG_DEBUG("TempAim : ~p~n", [TempAim]),
+                         ?LOG_DEBUG("~p make temp aim ~p ~n",[ {?MODULE,?LINE}, TempAim]),
+                          StartTime = erlang:now(),
+                          Res = (catch prolog:aim( finish, ?ROOT, Goal,  dict:new(), 
+                                                1, TreeEts, ?ROOT) ),
+                          ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
+                          shell_loop(ProcessResult, TreeEts, Back, Goal, TempAim)
+	    end
+.
+
+shell_loop(finish, _TreeEts, _Back, _Goal, _TempAim) ->
     %%REWRITE it like trace
     exit(normal)
 ;
- 
-shell_loop(start, TreeEts, Back) ->
+shell_loop(false, _TreeEts, _Back, _Goal, _TempAim) ->
     %%REWRITE it like trace
-
-	    receive 
-		  {some_code, Back, Code}->	  
-			  ?API_LOG("~p wait new aim from user ~p",[{?MODULE,?LINE}, {self(),Code} ]),
-			  {TempAim, _ShellContext }=  prolog_shell:make_temp_aim(Goal), 
-                         ?DEBUG("TempAim : ~p~n", [TempAim]),
-                         ?DEBUG("~p make temp aim ~p ~n",[ {?MODULE,?LINE}, TempAim]),
-                          StartTime = erlang:now(),
-                          Res = (catch prolog:aim( finish, ?ROOT, Code,  dict:new(), 
-                                                1, TreeEts, ?ROOT) ),
-                          ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
-                        
-                          shell_loop(ProcessResult, TreeEts, Back);
-	    end
+    exit(normal)
 ;
-shell_loop(Prev, TreeEts, Back) ->
+shell_loop(Prev, TreeEts, Back, Goal, TempAim ) ->
             receive  
                   {some_code, next}->
-                        ?API_LOG("~p send yes to ~p",[{?MODULE,?LINE} ,NextPid ]),  
-                        Prev = process_prove(Back,  TempAim , Goal, (catch prolog:next_aim(Prev, TreeEts )), erlang:now() ),
-                        shell_loop(Prev, TreeEts, Back);
+                        ?API_LOG("~p send yes ",[{?MODULE,?LINE}  ]),  
+                        NewPrev = process_prove(Back,  TempAim , Goal, 
+                                        (catch prolog:next_aim(Prev, TreeEts )), erlang:now(), TreeEts ),
+                        ?API_LOG("~p got  ~p",[{?MODULE,?LINE}, NewPrev  ]),  
+               
+                        shell_loop(NewPrev, TreeEts, Back,  Goal, TempAim);
                   {some_code, finish}->
-                        ?API_LOG("~p got finish send it  to ~p",[{?MODULE,?LINE} ,NextPid ]),  
+                        ?API_LOG("~p got finish send it  to ~p",[{?MODULE,?LINE} ]),  
                         prolog:clean_tree(TreeEts),
                         ets:delete(TreeEts),
-                        shell_loop(finish, TreeEts, Back) 
+                        shell_loop(finish, TreeEts, Back, Goal, TempAim) 
             end
 .   
 
-store_result(Session ,R) ->
-    case ets:lookup(?ERWS_LINK, Session) of
-	  []-> false;
-	  [ {Session, Pid, _OldRes,ProtoType, Time } ]->
-		ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType ,Time}),
-		true
-    end
-.
+
 process_prove( Back, TempAim , Goal, Res, StartTime, TreeEts)->
       case Res of 
              {'EXIT', FromPid, Reason}->
+                  ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal} ]),
+
                   store_result(Back, false),
                   prolog:clean_tree(TreeEts),
                   ets:delete(TreeEts),
                   finish;
+            false ->
+                  ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal} ]),
+                  FinishTime = erlang:now(),
+                  store_result(Back, false),
+                  prolog:clean_tree(TreeEts),
+                  ets:delete(TreeEts),
+                  false;  
             {true, SomeContext, Prev} ->
-                  ?DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal, dict:to_list(SomeContext)} ]),
+                  ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal} ]),
                   FinishTime = erlang:now(),
                   New = prolog_matching:bound_body( 
                                         Goal, 
                                         SomeContext
                                          ),
                   store_result(Back, New),
-                  Prev
-                                         
-            Res ->
-                   ?API_LOG("~p UNEXPECTED  ~p",[{?MODULE,?LINE}, Unexpected ]),
+                  Prev;                  
+            UNEXPECTED ->
+                   ?API_LOG("~p UNEXPECTED  ~p",[{?MODULE,?LINE}, UNEXPECTED ]),
                    store_result(Back, unexpected_error),
                    prolog:clean_tree(TreeEts),
                    ets:delete(TreeEts),
                    finish
      end.
-     
 
+store_result(Session ,R) ->
+    case ets:lookup(?ERWS_LINK, Session) of
+	    []-> false;%TODO clean all 
+	    [{Session, Pid, _OldRes,ProtoType, Time } ]->
+		    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType ,Time}),
+		    true
+    end.
 
-
-
-
-wait_result(Back, TreeEts)->
-	    ?API_LOG("~p wait  in ~p",[{?MODULE,?LINE} , self() ]),
-		    receive 
-			        {result, _R , finish, _BackPid } ->
-				       store_result(Back, false),
-				       clean(TreeEts);
-				{result, R , has_next, BackPid } ->
-				       case store_result(Back, R) of
-					true->
-					    ets:insert(TreeEts, {next, BackPid} );				      
-					false->
-					    BackPid ! finish,
-					    clean(TreeEts)
-					end;    
-				Unexpected ->
-				        ?API_LOG("~p UNEXPECTED  ~p",[{?MODULE,?LINE}, Unexpected ]),
-					store_result(Back, unexpected_error),
-					clean(TreeEts)
-		    end.
-		    
+    
 result(R) when  is_binary(R) ->
     R;
 result(R)  ->
-  list_to_binary ( lists:flatten( io_lib:format("~p",[R]) ) ).
+    list_to_binary ( lists:flatten( io_lib:format("~p",[R]) ) ).
 
 
-proc_object([ { <<"atom">>, Name } ] )->
-    list_to_atom( binary_to_list(Name) ) 
-;  
-proc_object([ { <<"name">>, Name } ] )->
-    { list_to_atom( binary_to_list(Name) ) }
-.
+proc_object([{<<"atom">>, Name }])->
+    list_to_atom( binary_to_list(Name));  
+proc_object([ { <<"name">>, Name}])->
+    {list_to_atom(binary_to_list(Name))}.
   
 process_json_params(E) when is_list(E)->
-	  proc_object(E)
-;
+	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  binary_to_list(E)
-.
+	  binary_to_list(E).
+
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
 	  {'EXIT',_}->
 	      error;
 	  NewList ->
-	      list_to_tuple( [ list_to_atom(binary_to_list(Aim))|NewList ] )
+	      list_to_tuple([list_to_atom(binary_to_list(Aim))|NewList])
 	end.
-
 
 generate_prolog_msg(Req, Aim)->
     {ok, PostVals, _Req2} = cowboy_req:body_qs(Req),
     Post = proplists:get_value(<<"params">>, PostVals,undefined),
-    ?API_LOG("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
-
+    ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
     Json  = ( catch jsx:decode(Post) ),
-    ?API_LOG("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
+    ?LOG_INFO("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
 %    jsx:decode(<<"[1,{\"name\":1}]">>).
 %    [1,[{<<"name">>,1}]]
     case Json of
-	{'EXIT', _ } -> error;
-	List when is_list(List)->
-	    process_params(Aim, List);
-	_-> error
-    end
-% 
-
-.
-	   
-	   
-	   
-
-
-
+	    {'EXIT', _ } -> error;
+	    List when is_list(List)->
+	        process_params(Aim, List);
+	    _-> error
+    end.
 
 generate_session()->
     {MSecs, Secs, MiSecs} = erlang:now(),
@@ -397,3 +366,4 @@ generate_session()->
     Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[ MSecs, Secs, MiSecs ]) ), %reference has only 14 symbols
     Res
 .
+

@@ -2,7 +2,7 @@
 #
 NODE=dev_api
 HOST=localhost.localdomain
-APP=prolog_open_api_app
+APP=prolog_open_api
 EBIN_DIR=ebin
 HOME_D=deps
 
