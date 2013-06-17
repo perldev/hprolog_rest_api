@@ -16,5 +16,5 @@ processed_queue('$end_of_table') ->
 processed_queue(Key) ->
     [{Key, Path, Req}] = ets:lookup(?QUEUE_TABLE, Key),
     api_erws_handle:api_handle(Path, Req, undefined),
-    ets:delete(Key),
+    ets:delete(?QUEUE_TABLE, Key),
     processed_queue(ets:first(?QUEUE_TABLE)).
