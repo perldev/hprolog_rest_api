@@ -157,7 +157,5 @@ function fraud_yes(Ref){
 }
 function fraud_no(){
   
-  
-  
 }
 

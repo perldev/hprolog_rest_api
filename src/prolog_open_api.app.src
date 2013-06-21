@@ -13,8 +13,7 @@
                     cowboy,
                     compiler,
                     syntax_tools
-                    
-                 ]},
+    ]},
   {mod, { prolog_open_api_app, []}},
   {env, [ 
   
