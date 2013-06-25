@@ -1,21 +1,23 @@
 var vm_statistic = {}
 
+var timerId
+
+var arrey = []
+
 vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
 
 vm_statistic.directives = {}
 
-vm_statistic.ws.onopen = function(evt)
-{
-    console.log("Socket open")
-    timer_vmstatus_log = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: "statistic"}))', 3000)
+vm_statistic.ws.onopen = function(evt){
+    console.log("Socket open");
+}
+
+vm_statistic.ws.onclose = function(){ 
+    console.log("Socket closed");  
 }
 
 vm_statistic.events = {}
 
-vm_statistic.ws.onclose = function()
-{ 
-    console.log("Socket closed"); 
-}
 
 /*vm_statistic.directives.vmstatus_log = $p('#vmstatus_log-page').compile(
 {
@@ -43,35 +45,36 @@ vm_statistic.ws.onclose = function()
             }
 })	*/
 
-vm_statistic.events.pageChange = function(evt)
-{
+
+vm_statistic.events.pageChange = function(evt){
     var page = $(this).attr('data-page')
-    if (page)
+    switch (page)
     {
-        vm_statistic.ws.send(JSON.stringify({action: "get", page: page}))
-        switch (typeof timer_vmstatus_log)
-        {
-            case "number":
-                clearInterval(timer_vmstatus_log)
-            break
-            case "undefined":
-            break
-        }    
-    }
-    return true
+        case "requests_to_work":
+            clearInterval(timerId);
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: page}))', 3000);
+        case "processes":
+            clearInterval(timerId);
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: page}))', 3000);
+        case "show_code":
+            clearInterval(timerId);
+            vm_statistic.ws.send(JSON.stringify({action: "get", page: page}));
+        case "undefined":
+        break
+    }  
 }
 
-/*
 vm_statistic.events.pageAutoChange = function(evt)
 {
     page = $(this).attr('data-pageAutoChange')
     switch (page)
     {
-        case "vmstatus_live":
-            timer_vmstatus_log = setInterval('vm_statistic.ws.send(JSON.stringify({action: "statistic", page: "vmstatus_live"}))', 3000)
+        case "statistic":
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: "statistic"}))', 3000);
         break
     }
-}   */
+}
+
 
 $('a').on('click', vm_statistic.events.pageAutoChange)
 $('a').on('click', vm_statistic.events.pageChange)
@@ -90,9 +93,7 @@ var options = { chart: {
 	    	text: 'Counter Facts'
 	    },
 	    legend: { enabled: false},
-	    series: [{
-	        name: 'Fact1',  
-            data: []
+	    series: [{ data: genMassive()
 	}]
 }
 
@@ -126,18 +127,19 @@ var options = { chart: {
 function genMassive()  {
                     // generate an array of random data
                     var data = [],
-                    time = (new Date()).getTime(),
-                    i;
+                    time = (new Date()).getTime(),i;
                     for (i = -19; i <= 0; i++) {
                         data.push({
-                            x: time + i * 1000,
-                            y: Math.random()
+                            x: Math.floor((Math.random()*100)+1),
+                            y: Math.floor((Math.random()*100)+1),
+                            z: Math.floor((Math.random()*100)+1),
                         });
                     }
                     return data;
                 }
 
 function eventData(){
+    var arrey = [];
     var series = this.series[0];
     vm_statistic.ws.onmessage = function(evt) { 
 	    console.log("Received_msg:", evt.data);
@@ -149,11 +151,51 @@ function eventData(){
                     $(selectorId).render(msg.data, vm_statistic.directives[vm_statistic.page])
                     break	            
                 case "statistic":
-                    var arrey = msg.statistic
-                    console.log("arrey:", arrey);
-                    $.map( arrey, function(n){
-                    chart.series[0].addPoint(n);
+                    //var arrey = msg.statistic
+                    var arrey = [
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
+                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)]
+                    ]
+                    //console.log("arrey:", arrey);
+                    $.map( arrey, function(point){
+                    chart.series[0].addPoint(point, true, true);
                     });
+                    case "requests_to_work":
+                    //var requests = msg.requests
+                    var requests = "[{<0.18222.454>,{assert,{user_ip,"2603018974","195.211.175.165"}}}]",
+                    console.log("requests:", requests),
+                    $("#requests").append("<br/>");
+                    $("#requests").append("<div>" + requests + "</div>");
+                break
         }
     } 
 }

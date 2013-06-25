@@ -1,22 +1,33 @@
-REBAR = ./rebar
+REBAR=`which rebar || echo ./rebar`
+DIALYZER = dialyzer
 
-# ERLC_OPTS = +debug_info
+all: get-deps compile
 
-all: 
-	$(REBAR) get-deps
-	$(REBAR) compile
+get-deps:
+	@$(REBAR) get-deps
 
-#	cp converter_app.app.src ebin/converter_app.app
-
+compile:
+	@$(REBAR) compile
 
 clean:
-	$(REBAR) clean
+	@$(REBAR) clean
 
-ctags:
-	cd $(SRC_DIR) ; ctags -R . ../include 
+tests: eunit ct
 
-$(EBIN_DIR) :
-	( test -d $(EBIN_DIR) || mkdir -p $(EBIN_DIR) )
+eunit:
+	@$(REBAR) skip_deps=true eunit
 
-tests: 
-	$(REBAR) skip_deps=true eunit  
+ct:
+	@$(REBAR) skip_deps=true ct
+
+check: xref dialyzer 
+
+xref:
+	@$(REBAR) skip_deps=true xref
+
+dialyzer:
+	@$(DIALYZER) -q -n -I include --src src/*.erl -Werror_handling \
+		-Wrace_conditions -Wno_return # -Wunmatched_returns -Wunderspecs
+
+docs:
+	@$(REBAR) doc

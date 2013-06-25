@@ -10,6 +10,8 @@
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
 
+%% for statistic
+-export([requests_to_work/0]).
 
 % Called to know how to dispatch a new connection.
 init({tcp, http}, Req, _Opts) ->
@@ -25,13 +27,13 @@ handle(Req, State) ->
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
      {ok, NewReq, State}.
+    
 
-start_link_session( Session, SourceMsg, NameSpace) ->
-        Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
-        [] = ets:lookup(?ERWS_LINK, Session), %%do not use one session
-        %[_Name | Args] = tuple_to_list(SourceMsg),
-        ets:insert(?ERWS_LINK,{ Session, Pid, wait, SourceMsg, now()}),       
-    Pid.
+start_link_session(Session, SourceMsg, NameSpace) ->
+    Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
+    insert_req(NameSpace, Session),
+    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now()}),       
+    ok.
 	
 start_new_aim(Msg, NameSpace) when is_tuple(Msg) ->
     %TODO make key from server
@@ -62,73 +64,70 @@ api_var_match({ { Key }, Val}) when is_atom(Val)->
 api_var_match({ { Key }, Val}) -> 
    {Key, Val}.
 
-get_result(Session)->
+get_result(Session, NameSpace)->
     case ets:lookup(?ERWS_LINK, Session) of 
 	[]->   session_finished;
 	[{_, _Pid, wait, _ProtoType, _Time  }]->
 		result_not_ready;
 	[{_, Pid, false, _ProtoType, _Time  }]->
+        delete_req(NameSpace, Session),
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		false;
 	[{_, Pid, unexpected_error, _ProtoType, _Time  } ]->
+        delete_req(NameSpace, Session),
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		unexpected_error;	
-	[{_,_,SomeThing, ProtoType, _Time  }] -> 
-                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
-		  ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
-		  VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
-		  jsx:encode( [ {status, true}, {result, VarsRes}])
+	[{_,_,SomeThing, ProtoType, _Time  }] ->
+        delete_req(NameSpace, Session), 
+        {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
+		?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
+		VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
+		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
 
 
-generate_http_resp(session_finished, Req)->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"session finished">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);
+generate_http_resp(try_again, Req) ->
+    Response  = jsx:encode([{status,<<"try_again">>},{description, <<"reload namespace">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+generate_http_resp(session_finished, Req) ->
+    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"session finished">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(result_not_ready, Req)->
-    Response  = jsx:encode([{status,<<"wait">>},{ description, <<"result not ready">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);
+    Response  = jsx:encode([{status,<<"wait">>},{ description, <<"result not ready">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(false, Req)->
-    Response  = jsx:encode([{status,<<"false">>},{ description, <<"aim was not reached">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);
+    Response  = jsx:encode([{status,<<"false">>},{ description, <<"aim was not reached">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(unexpected_error, Req)->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"we have got unexpected error">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);
+    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"we have got unexpected error">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(aim_in_process, Req)->
     Response  = jsx:encode([{status,<<"wait">>},{ description, <<"this aim in process">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);	
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
 generate_http_resp(permissions_denied, Req)->
     Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);	
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
 generate_http_resp(not_found, Req)->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"not found">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);		
+    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"not found">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);		
 generate_http_resp(true, Req)->
     Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Response, Req);	
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
 generate_http_resp(Json, Req)->
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-					Json, Req).
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Json, Req).
 
 api_handle_command([<<"reload">>, BinNameS], Req) ->
     ?LOG_INFO("Reload: ~p~n", [Req]),
     NameSpace = binary_to_list(BinNameS),
     Res = case fact_hbase:check_exist_table(NameSpace ++ ?META_FACTS) of
-        false -> 
+        false ->
+            io:format("res check exist_table: ~p~n", [false]), 
             <<"fail">>;
-        true -> 
-            prolog:delete_inner_structs(NameSpace),
-            fact_hbase:load_rules2ets(NameSpace),  
-            <<"true">>;
+        true ->
+            io:format("res check exist_table: ~p~n", [true]),
+            reload(NameSpace);
         _ -> 
             <<"fail">>
     end,
@@ -142,10 +141,10 @@ api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req);
-api_handle_command([<<"process">>, _NameSpace, Session], Req) ->    %%TODO
+api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-    Result  = get_result( binary_to_list(Session)),
+    Result  = get_result( binary_to_list(Session), binary_to_list(NameSpace)),
     generate_http_resp(Result, Req);
 api_handle_command([<<"finish">>, _NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
@@ -177,7 +176,9 @@ api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
             auth_demon:change_status(Ip, NameSpace, {status, off}),  
             Result = api_handle_command(Path, Req),
             auth_demon:change_status(Ip, NameSpace, {status, on}),
-            Result 
+            Result;
+        try_again ->
+            generate_http_resp(try_again, Req1)
     end;
 api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, NameSpace, Cmd, State]),
@@ -187,8 +188,8 @@ api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
             generate_http_resp(permissions_denied, Req1);
 	    true  -> 
             api_handle_command(Path, Req);
-        need_in_queue ->
-            true = ets:insert(?QUEUE_TABLE, {now(), Path, Req})
+        try_again ->                    
+            generate_http_resp(try_again, Req1)
     end;
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
@@ -243,7 +244,7 @@ shell_loop(start, TreeEts, Back) ->
 		    ?API_LOG("~p wait new aim from user ~p",[{?MODULE,?LINE}, {self(),Goal}]),
 			{TempAim, _ShellContext} =  prolog_shell:make_temp_aim(Goal), 
             ?LOG_DEBUG("TempAim : ~p~n", [TempAim]),
-            ?LOG_DEBUG("~p make temp aim ~p ~n",[ {?MODULE,?LINE}, TempAim]),
+            ?LOG_DEBUG("~p make temp aim ~p ~n",[{?MODULE,?LINE}, TempAim]),
             StartTime = erlang:now(),
             Res = (catch prolog:aim( finish, ?ROOT, Goal,  dict:new(), 1, TreeEts, ?ROOT)),
             ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
@@ -351,6 +352,51 @@ generate_session()->
     {MSecs, Secs, MiSecs} = erlang:now(),
     %this is not the perfect fast procedure but it work in thread cause this
     % im do not want to rewrite it 
-    Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[ MSecs, Secs, MiSecs ]) ), %reference has only 14 symbols
+    Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[ MSecs, Secs, MiSecs])), %reference has only 14 symbols
     Res.
 
+%% Check Reqs
+reload(NameSpace) ->
+    case ets:lookup(?REQS_TABLE, NameSpace) of
+        [{NameSpace, []}] ->
+            prolog:delete_inner_structs(NameSpace),
+            fact_hbase:load_rules2ets(NameSpace),  
+            <<"true">>;
+        _ ->
+            spawn(fun() -> start_aside_reload(NameSpace) end),
+            <<"set_aside">>
+            
+    end.   
+
+start_aside_reload(NameSpace) ->
+    start_aside_reload(NameSpace, ets:lookup(?REQS_TABLE, NameSpace)).
+
+start_aside_reload(NameSpace, [{NameSpace, []}]) ->
+    prolog:delete_inner_structs(NameSpace),
+    fact_hbase:load_rules2ets(NameSpace),
+    ok;
+start_aside_reload(NameSpace, _Any) ->
+    start_aside_reload(NameSpace).
+    
+
+%% Delete/ Insert Reqs
+insert_req(NameSpace, Session) ->
+    case ets:lookup(?REQS_TABLE, NameSpace) of
+        [{NameSpace, SessionList}] ->
+            ets:insert(?REQS_TABLE, {NameSpace, [Session|SessionList]});
+        [] ->
+            ets:insert(?REQS_TABLE, {NameSpace, [Session]})
+    end.
+
+delete_req(NameSpace, Session) ->
+    case ets:lookup(?REQS_TABLE, NameSpace) of
+        [{NameSpace, SessionList}] ->
+            NewSessionList = lists:delete(Session, SessionList),
+            ets:insert(?REQS_TABLE, {NameSpace, NewSessionList});
+        [] ->
+            ok
+    end.
+
+%% Statistic api
+requests_to_work() ->
+    ets:tab2list(?ERWS_LINK).

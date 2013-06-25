@@ -72,7 +72,7 @@ handle_call({check_auth, Ip, NameSpace }, _From ,State) ->
     EtsRegis = State#monitor.registered_ip,
     Res = case ets:lookup(EtsRegis, {NameSpace, Ip}) of 
 		    [{{NameSpace, Ip}, {status, on}, _}] -> true; %normal
-            [{{NameSpace, Ip}, {status, off}, _}] -> need_in_queue;
+            [{{NameSpace, Ip}, {status, off}, _}] -> try_again;
 		    [] -> false
 	end,
     {reply, Res ,State};
@@ -106,7 +106,8 @@ low_auth(State, Ip, NameSpace)->
 start_namespace(State, NameSpace, Ip)->
 	EtsRegis = State#monitor.registered_ip,
   	EtsNameSpace = State#monitor.registered_namespaces,
-	ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now() }),
+	ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
+    ets:insert(?REQS_TABLE, {NameSpace, []}),
 	case ets:lookup(EtsNameSpace,NameSpace) of
 	    [] -> 
 		    prolog_shell:api_start(NameSpace),

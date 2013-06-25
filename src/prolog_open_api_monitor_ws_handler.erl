@@ -9,7 +9,7 @@
             websocket_terminate/3 
              
 ]).
--export([statistic/2]).
+-export([statistic/2, current_processes/2, show_code/2, requests_to_work/2]).
 
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_websocket}.
@@ -49,6 +49,20 @@ statistic(<<"get">>, Req) ->
     %Data = [[12,36,70], [3,4,5], [1,6,5]],
     {ok, Data} = converter_monitor:get_statistic(),
     {to_peer, lists:flatten([{<<"statistic">>, Data}|Req])}.
+
+requests_to_work(<<"get">>, Req) ->
+    Data = [{first_req, {bla_bla, bla_bla2}}], 
+    {to_peer, lists:flatten([{<<"requests_to_work">>, Data}|Req])}.
+
+current_processes(<<"get">>, Req) ->
+    {ok, Data} = converter_monitor:get_statistic(),
+    {to_peer, lists:flatten([{<<"processes">>, Data}|Req])}.
+
+show_code(<<"get">>, _Req) ->
+    ok.
+
+
+
 
 
 
