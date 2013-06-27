@@ -35,7 +35,7 @@ init([]) ->
 		        registered_namespaces = NameSpace,
 		        registered_ip = Registered,
 		        auth_info = Auth,
-		        proc_table = ets:new( proc_table, [named_table ,public ,set ] 
+		        proc_table = ets:new( proc_table, [named_table ,public ,set] 
     )}}.
 
 %%cach auth information
@@ -56,7 +56,7 @@ load_tables()->
 				        end,[], Tab2),
 			            Tab2;	
 			        _ -> 
-			            ets:new( registered_ip, [named_table ,public ,set ] )
+			            ets:new( registered_ip, [named_table ,public ,set])
 	end,
     {NameSpace, Registered}.      
 
@@ -65,7 +65,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_call( {auth, Ip, NameSpace }, _From ,State) ->
     ?LOG_DEBUG("try auth with  ~p ~n", [{auth, Ip, NameSpace }] ),
-    Res = try_auth(Ip, NameSpace, State  ),
+    Res = try_auth(Ip, NameSpace, State ),
     {reply, Res ,State};
 handle_call({check_auth, Ip, NameSpace }, _From ,State) ->
     ?LOG_DEBUG("check auth ~p ~n", [{Ip, NameSpace}]),
@@ -98,9 +98,10 @@ low_auth(State, Ip, NameSpace)->
     Ets = State#monitor.auth_info,
     case ets:lookup(Ets, {Ip,NameSpace}) of
 	    [_] -> 
-	        start_namespace(State, NameSpace, Ip  ),
+	        start_namespace(State, NameSpace, Ip),
 	        true;
-	    [] -> false
+	    [] -> 
+            false
     end.
 
 start_namespace(State, NameSpace, Ip)->

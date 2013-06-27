@@ -11,7 +11,7 @@
 -export([init/3, handle/2, terminate/3]).
 
 %% for statistic
--export([requests_to_work/0]).
+-export([requests_to_work/0, processes_count/0]).
 
 % Called to know how to dispatch a new connection.
 init({tcp, http}, Req, _Opts) ->
@@ -66,10 +66,10 @@ api_var_match({ { Key }, Val}) ->
 
 get_result(Session, NameSpace)->
     case ets:lookup(?ERWS_LINK, Session) of 
-	[]->   session_finished;
-	[{_, _Pid, wait, _ProtoType, _Time  }]->
+	[]-> session_finished;
+	[{_, _Pid, wait, _ProtoType, _Time}] ->
 		result_not_ready;
-	[{_, Pid, false, _ProtoType, _Time  }]->
+	[{_, Pid, false, _ProtoType, _Time}] ->
         delete_req(NameSpace, Session),
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
@@ -79,7 +79,7 @@ get_result(Session, NameSpace)->
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		unexpected_error;	
-	[{_,_,SomeThing, ProtoType, _Time  }] ->
+	[{_,_,SomeThing, ProtoType, _Time}] ->
         delete_req(NameSpace, Session), 
         {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
 		?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
@@ -376,9 +376,9 @@ start_aside_reload(NameSpace, [{NameSpace, []}]) ->
     fact_hbase:load_rules2ets(NameSpace),
     ok;
 start_aside_reload(NameSpace, _Any) ->
+    timer:sleep(1000),
     start_aside_reload(NameSpace).
     
-
 %% Delete/ Insert Reqs
 insert_req(NameSpace, Session) ->
     case ets:lookup(?REQS_TABLE, NameSpace) of
@@ -400,3 +400,6 @@ delete_req(NameSpace, Session) ->
 %% Statistic api
 requests_to_work() ->
     ets:tab2list(?ERWS_LINK).
+
+processes_count() ->
+    length(ets:tab2list(proc_table)).
