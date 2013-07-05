@@ -6,9 +6,10 @@
 -behaviour(application).  
 -export([start/2, stop/1]).  
 -include("open_api.hrl").
+-export([start_listener/0]).
 
 start(_StartType, _StartArgs) ->
-    start_listener(),
+    timer:apply_after(1000, ?MODULE, start_listener,[] ),
     ets:new(?REQS_TABLE, [named_table, public, set]),  
     prolog_open_api_sup:start_link().  
     
@@ -34,7 +35,10 @@ start_listener() ->
 				      }
 				]}]}
 	]),
-	{ok, _} = cowboy:start_http(http, ?COUNT_LISTENERS, [{port, ?WORK_PORT}],
-	[{env, [{dispatch, Dispatch}]}]).
+	{ok, Port} = application:get_env(prolog_open_api, work_port),
+	{ok, Listeners} = application:get_env(prolog_open_api, count_listeners ),
+
+	{ok, _} = cowboy:start_http(http, Listeners, [{port, Port}],
+                                    [{env, [{dispatch, Dispatch}]}]).
 
 
