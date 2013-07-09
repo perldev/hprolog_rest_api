@@ -1,7 +1,6 @@
 #!/bin/sh
 
-curl     http://localhost:8313/prolog/auth/test_namespace/
-#curl     http://127.0.0.1:8313/prolog/auth/test_namespace/
+curl -d ""    http://127.0.0.1:8313/prolog/auth/test
 
 #curl -d"data={\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"login\":\"none2\",\"password\":\"bezumie\",\"user_ip\":\"127.0.0.1\",\"email\":\"perldev@mail.ru\"}"    http://127.0.0.1:8086/api/registration/new
 
