@@ -9,7 +9,7 @@
 -export([start_listener/0]).
 
 start(_StartType, _StartArgs) ->
-    timer:apply_after(1000, ?MODULE, start_listener,[] ),
+    timer:apply_after(4000, ?MODULE, start_listener,[] ),
     ets:new(?REQS_TABLE, [named_table, public, set]),  
     prolog_open_api_sup:start_link().  
     
@@ -18,12 +18,12 @@ stop(_State) ->
 
 start_listener() ->
     Dispatch = cowboy_router:compile([
-		{'_', [
+        {'_', [
             {"/prolog/[...]", api_erws_handler, []},
             {"/monitor", prolog_open_api_monitor_handler, []},
 			{"/websocket", prolog_open_api_monitor_ws_handler, []},
             %%{"/prolog/create_sync/[...]", api_sync_handler, []},
-				{"/[...]", cowboy_static, [
+                           {"/[...]", cowboy_static, [
 					{directory, <<"static">>},
 						{mimetypes, 
 						[
