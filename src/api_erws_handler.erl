@@ -185,11 +185,11 @@ api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
     case auth_demon:check_auth(Ip, NameSpace) of
 	    false -> 
-                generate_http_resp(permissions_denied, Req1);
+            generate_http_resp(permissions_denied, Req1);
 	    true  -> 
-                api_handle_command(Path, Req);
-            try_again ->                    
-                generate_http_resp(try_again, Req1)
+            api_handle_command(Path, Req);
+        try_again ->                    
+            generate_http_resp(try_again, Req1)
     end;
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),

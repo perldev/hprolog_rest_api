@@ -9,7 +9,13 @@
             websocket_terminate/3 
              
 ]).
--export([statistic/2, current_processes/2, show_code/2, requests_to_work/2]).
+-export([   graph/2, 
+	    current_processes/2, 
+	    code_memory/2, 
+	    requests/2,
+	    namespaces/2,
+	    state_system/2
+]).
 
 init({tcp, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_websocket}.
@@ -21,9 +27,9 @@ websocket_handle({text, JSONRequest}, Req, State) ->
     Request = jsx:decode(JSONRequest),
     io:format("req: ~p~n", [Request]),
     try
-        Page = proplists:get_value(<<"page">>, Request),
+        Cmd = proplists:get_value(<<"cmd">>, Request),
         Action = proplists:get_value(<<"action">>, Request),
-        case erlang:apply(?MODULE, binary_to_existing_atom(Page, utf8), [Action, Request]) of
+        case erlang:apply(?MODULE, binary_to_existing_atom(Cmd, utf8), [Action, Request]) of
             {to_peer, Response} ->
                 JsonOkResponse = jsx:encode(Response),
                 io:format("Response: ~p~n", [JsonOkResponse]),
@@ -45,20 +51,35 @@ websocket_info({send, Msg}, Req, State) ->
 websocket_terminate(_Reason, _Req, _State) ->
 	ok.
 
-statistic(<<"get">>, Req) ->
-    %Data = [[12,36,70], [3,4,5], [1,6,5]],
-    {ok, Data} = converter_monitor:get_statistic(),
-    {to_peer, lists:flatten([{<<"statistic">>, Data}|Req])}.
+%% Get namespaces
+namespaces(<<"get">>, Req) ->
+    NameSpaces = prolog_open_api_statistics:get_namespaces(),
+    io:format("Resoult get nameSpaces: ~p~n", [NameSpaces]),
+    {to_peer, lists:flatten([{<<"namespaces">>, NameSpaces}|Req])}.
 
-requests_to_work(<<"get">>, Req) ->
-    Data = [{first_req, {bla_bla, bla_bla2}}], 
-    {to_peer, lists:flatten([{<<"requests_to_work">>, Data}|Req])}.
+%% Get Graph Data
+graph(<<"get">>, Req) ->
+    NameSpace = proplists:get_value(<<"namespace">>, Req),
+    {ok, Data} = prolog_open_api_statistics:get_graph_data(binary_to_list(NameSpace)),
+    {to_peer, lists:flatten([{<<"graph_data">>, Data}|Req])}.
 
+%% Get requests_to_work
+requests(<<"get">>, Req) ->
+    {ok, Data} = prolog_open_api_statistics:get_requests("test"), 
+    {to_peer, lists:flatten([{<<"requests">>, Data}|Req])}.
+
+%% Get current processes
 current_processes(<<"get">>, Req) ->
-    {ok, Data} = converter_monitor:get_statistic(),
+    {ok, Data} = prolog_open_api_statistics:get_processes(),
     {to_peer, lists:flatten([{<<"processes">>, Data}|Req])}.
 
-show_code(<<"get">>, _Req) ->
+%% Get gen statistic_system (ets:tab2list(stat))
+state_system(<<"get">>, Req) ->
+    {ok, Data} = prolog_open_api_statistics:get_system_state(),
+    {to_peer, lists:flatten([{<<"processes">>, Data}|Req])}. 
+
+%% Show Api code
+code_memory(<<"get">>, _Req) ->
     ok.
 
 

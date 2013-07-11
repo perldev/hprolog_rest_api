@@ -1,83 +1,53 @@
-var vm_statistic = {}
+var vm_statistic = {};
 
-var timerId
+var timerId;
 
-var arrey = []
+var arrey = [];
 
-vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
+vm_statistic.ws = new WebSocket("ws://avias-db-2.ceb.loc:8313/websocket");
 
-vm_statistic.directives = {}
+var page;
 
 vm_statistic.ws.onopen = function(evt){
     console.log("Socket open");
+    vm_statistic.ws.send(JSON.stringify({action: "get", cmd: "namespaces"}));
 }
 
 vm_statistic.ws.onclose = function(){ 
     console.log("Socket closed");  
 }
-
 vm_statistic.events = {}
 
-
-/*vm_statistic.directives.vmstatus_log = $p('#vmstatus_log-page').compile(
-{
-    '@class+':' active',
-    'table':{
-        'node<-':{
-            'caption[data-designation="node_name_log"]':function(nodename_log){return nodename_log.node.pos},
-            'table tbody tr':{
-                'row<-node':{
-                    'td[data-designation="date"]':'row.date',
-                    'td[data-designation="total"]':'row.total',
-                    'td[data-designation="processes"]':'row.processes',
-                    'td[data-designation="processes_used"]':'row.processes_used',
-                    'td[data-designation="system"]':'row.system',
-                    'td[data-designation="atom"]':'row.atom',
-                    'td[data-designation="atom_used"]':'row.atom_used',
-                    'td[data-designation="binary"]':'row.binary',
-			        'td[data-designation="code"]':'row.code',
-                    'td[data-designation="ets"]':'row.ets',
-                    'td[data-designation="process_count"]':'row.process_count',
-                    'td[data-designation="process_limit"]':'row.process_limit'
-                }
-            }
-                }
-            }
-})	*/
-
-
-vm_statistic.events.pageChange = function(evt){
+/*vm_statistic.events.pageChange = function(evt){
     var page = $(this).attr('data-page')
-    switch (page)
-    {
-        case "requests_to_work":
+    switch (page) {
+        case "requests":
             clearInterval(timerId);
-            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: page}))', 3000);
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", cmd: page}))', 3000);
         case "processes":
             clearInterval(timerId);
-            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: page}))', 3000);
-        case "show_code":
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", cmd: page}))', 3000);
+	case "code_memory":
             clearInterval(timerId);
-            vm_statistic.ws.send(JSON.stringify({action: "get", page: page}));
+            vm_statistic.ws.send(JSON.stringify({action: "get", cmd: page}));
         case "undefined":
-        break
+    	    console.log("undefined");
+	break
     }  
-}
+} */
 
-vm_statistic.events.pageAutoChange = function(evt)
-{
-    page = $(this).attr('data-pageAutoChange')
-    switch (page)
-    {
-        case "statistic":
-            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", page: "statistic"}))', 3000);
+/*vm_statistic.events.pageAutoChange = function(evt){
+    page = $(this).attr('data-pageAutoChange');
+    switch (page) {
+        case "graph":
+            timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: "test", cmd: "graph"}))', 3000);
         break
     }
-}
+} */
 
 
-$('a').on('click', vm_statistic.events.pageAutoChange)
-$('a').on('click', vm_statistic.events.pageChange)
+$('a').on('click', vm_statistic.events.pageAutoChange);
+$('a').on('click', vm_statistic.events.pageChange);
 
 $(document).ready(function() {
     chart = new Highcharts.Chart(options);
@@ -96,7 +66,6 @@ var options = { chart: {
 	    series: [{ data: genMassive()
 	}]
 }
-
 
 /*var options = { chart: {
             renderTo: 'graph',
@@ -136,68 +105,54 @@ function genMassive()  {
                         });
                     }
                     return data;
-                }
+}
 
 function eventData(){
     var arrey = [];
     var series = this.series[0];
     vm_statistic.ws.onmessage = function(evt) { 
-	    console.log("Received_msg:", evt.data);
+	console.log("Received_msg:", evt.data);
         var msg = JSON.parse(evt.data);
-	        switch (msg.page){
-                case "vmstatus_log":
-                    vm_statistic.page = msg.page
-                    var selectorId = '#' + vm_statistic.page +'-page'
-                    $(selectorId).render(msg.data, vm_statistic.directives[vm_statistic.page])
-                    break	            
-                case "statistic":
-                    //var arrey = msg.statistic
-                    var arrey = [
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)],
-                                [Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1), Math.floor((Math.random()*100)+1)]
-                    ]
-                    //console.log("arrey:", arrey);
-                    $.map( arrey, function(point){
-                    chart.series[0].addPoint(point, true, true);
-                    });
-                    case "requests_to_work":
-                    //var requests = msg.requests
-                    var requests = "[{<0.18222.454>,{assert,{user_ip,"2603018974","195.211.175.165"}}}]",
-                    console.log("requests:", requests),
-                    $("#requests").append("<br/>");
-                    $("#requests").append("<div>" + requests + "</div>");
-                break
-        }
+	console.log(msg.cmd);
+	switch (msg.cmd){
+	    case "namespaces":
+		var namespaces = msg.namespaces;
+		console.log("namespaces:", namespaces);
+		appendNamespaces(namespaces);
+	    break
+            case "graph":
+                var arrey = msg.graph_data;
+                console.log("graph_data:", arrey);
+                $.map( arrey, function(point){
+                chart.series[0].addPoint(point, true, true);
+                })
+	    break
+            case "requests":
+                //var requests = msg.requests
+                var requests = "blabla";
+                console.log("requests:", requests);
+                $("#requests").append("<br/>");
+                $("#requests").append("<div>" + requests + "</div>");
+	    break
+        }    
     } 
 }
+
+function appendNamespaces(NameSpaces){
+    Res = "NameSpaces : ";
+    for( i in NameSpaces) {
+    var Name = NameSpaces[i];
+    Res +="<span id='"+ Name +"' class='btn btn-info' style='height:20px' onclick=\"sendName(this)\" >" + Name + "</span>&nbsp;";
+    	}  
+    $("#namespaces").html(Res);                
+}
+
+function sendName(obj){
+    NameSpace = obj.id;
+    console.log(NameSpace);
+    clearInterval(timerId);
+    timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: "graph"}))', 3000);
+}
+
 
 
