@@ -29,13 +29,14 @@ start_link() ->
 
 %%TODO name spaces
 init([]) ->
-	Auth = ets:new(auth_info, [named_table ,public ,set]), 
-	{ NameSpace, Registered } = load_tables(),
+	Auth = ets:new(auth_info, [named_table ,public ,set]),
+	ets:new(system_state, [named_table, public]),
+	ets:insert(system_state, {prolog_api, on}),  
+	{NameSpace, Registered } = load_tables(),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, []),
-
-	timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
+        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(1000, ?MODULE, load_auth_info, []),
-        { ok, #monitor{
+        {ok, #monitor {
                             registered_namespaces = NameSpace,
                             registered_ip = Registered,
                             auth_info = Auth,
@@ -111,13 +112,13 @@ start_namespace(State, NameSpace, Ip)->
 	EtsRegis = State#monitor.registered_ip,
   	EtsNameSpace = State#monitor.registered_namespaces,
 	ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
-        ets:insert(?REQS_TABLE, {NameSpace, []}),
+    	ets:insert(?REQS_TABLE, {NameSpace, []}),
 	case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
-		    prolog_shell:api_start(NameSpace),
-		    ets:insert(EtsNameSpace,  {NameSpace, now()}),
-		    true;
-		_-> true
+                prolog_shell:api_start(NameSpace),
+		ets:insert(EtsNameSpace,  {NameSpace, now()}),
+		true;
+	    _-> true
 	end.
 
 low_stop_auth(State,  Ip, NameSpace)->
@@ -204,15 +205,20 @@ deauth(Ip, NameSpace )->
 check_auth(Ip, NameSpace) when is_binary(NameSpace) ->
     check_auth(Ip, binary_to_list(NameSpace));
     
-check_auth(Ip, NameSpace)->
+check_auth(Ip, NameSpace) ->
     EtsRegis = registered_ip,
-    Res = case ets:lookup(EtsRegis, {NameSpace, Ip}) of 
-                    [{{NameSpace, Ip}, {status, on}, _}] -> true; %normal
-            [{{NameSpace, Ip}, {status, off}, _}] -> try_again;
-                    [] -> false
-        end,
-    Res
-    .
+    State = check_system_state(),
+    Res = case {ets:lookup(EtsRegis, {NameSpace, Ip}), State} of 
+        {[{{NameSpace, Ip}, {status, on}, _}], true} -> true; %normal
+	{[{{NameSpace, Ip}, {status, on}, _}], false} -> system_off; % state off
+	{[{{NameSpace, Ip}, {status, off}, _}], false} -> system_off; % state off 
+        {[{{NameSpace, Ip}, {status, off}, _}], true} -> try_again;
+        {[], _} -> false
+    end,
+    Res.
+
+check_system_state() ->
+    [{prolog_api, on}] =:= ets:lookup(system_state, prolog_api).
 
 change_status(Ip, NameSpace, Status) ->
     gen_server:cast(?MODULE, {change_status, Ip, NameSpace, Status}).
@@ -233,16 +239,14 @@ check_expired_sessions()->
                             end
               end,
     NewKey = ets:first(?ERWS_LINK),
-    check_expired_key(NewKey, Fun, ?ERWS_LINK )
-.
+    check_expired_key(NewKey, Fun, ?ERWS_LINK).
 
 check_expired_key('$end_of_table', _Fun,  _Table )->
     finish;
 check_expired_key(Key, Fun, Table)->
     [ Value ] = ets:lookup(Table, Key),
     NewKey = Fun(Value, Table, Key),
-    check_expired_key(NewKey, Fun, Table )
-.
+    check_expired_key(NewKey, Fun, Table).
 
     
 cache_connections() ->

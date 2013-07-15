@@ -8,6 +8,7 @@ init(_Transport, Req, []) ->
 	{ok, Req, undefined}.
 
 handle(Req, State) ->
+    %%io:format("req: ~p~n", [Req]), 
 	Html = get_html(),
 	{ok, Req2} = cowboy_req:reply(200,
 		[{<<"content-type">>, <<"text/html">>}],
