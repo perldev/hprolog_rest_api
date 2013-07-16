@@ -85,27 +85,16 @@ function switchSidebars(){
 
  
 var options = { chart: {
-                renderTo: 'graph',
+            renderTo: 'graph',
 	        type: 'bubble',
 	        zoomType: 'xy',
-                events: { load: eventData}
+            events: { load: eventData}
 	    },
         title: {
 	    	text: 'Counter Facts'
 	    },
-           
 	    legend: { enabled: false},
-	    series: [{
-                    name: FactName, 
-                    dataLabels: {
-                            enabled: true,
-                            x:40,
-                            formatter:function() {
-                                return this.point.name;
-                            },
-                            style:{color:"black"}
-                    },
-                    data: genMassive()
+	    series: [{name: FactName, data: genMassive()
 	}]
 }
 
@@ -113,7 +102,7 @@ var options = { chart: {
 function genMassive()  {
                     var data = [],
                     time = (new Date()).getTime(),i;
-                    for (i = -1000; i <= 0; i++) {
+                    for (i = -50; i <= 0; i++) {
                         data.push({
                             x: Math.floor((Math.random()*100)+1),
                             y: Math.floor((Math.random()*100)+1),
@@ -140,9 +129,8 @@ function eventData(){
         case "graph":
             arrey = msg.graph_data;
             $.map( arrey, function(Point){
-		    FactName = Point.name;
+		    //FactName = Point.name;
 		    GraphData = Point.data;
-	        chart.series.update = {name: FactName};
             chart.series[0].addPoint(GraphData, true, true);
             });
 	    break
@@ -201,7 +189,7 @@ function sendName(obj){
     case "graph":
         console.log("graph_page");
     	clearInterval(timerId);
-    	timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: page}))', 3000);
+    	timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: page}))', 30000);
     break
     case "monitor":
 	    console.log("requests_page");
