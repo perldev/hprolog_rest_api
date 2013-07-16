@@ -10,9 +10,6 @@
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
 
-%% for statistic
--export([requests_to_work/0, processes_count/0]).
-
 % Called to know how to dispatch a new connection.
 init({tcp, http}, Req, _Opts) ->
     {ok, Req, undefined}.
@@ -31,10 +28,11 @@ handle(Req, State) ->
 
 start_link_session(Session, SourceMsg, NameSpace) ->
     Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
-    insert_req(NameSpace, Session),
-    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now()}),       
+    Req = {Session, Pid, wait, SourceMsg, now()},
+    insert_req(NameSpace, Req),
+    ets:insert(?ERWS_LINK, Req),       
     ok.
-	
+     	
 start_new_aim(Msg, NameSpace) when is_tuple(Msg) ->
     %TODO make key from server
     NewSession = generate_session(), 
@@ -87,7 +85,9 @@ get_result(Session, NameSpace)->
 		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
 
-
+generate_http_resp(system_off, Req) ->
+    Response  = jsx:encode([{status,<<"fail">>},{description, <<"system_off">>}]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(try_again, Req) ->
     Response  = jsx:encode([{status,<<"try_again">>},{description, <<"reload namespace">>}]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
@@ -178,7 +178,9 @@ api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
             auth_demon:change_status(Ip, NameSpace, {status, on}),
             Result;
         try_again ->
-            generate_http_resp(try_again, Req1)
+            generate_http_resp(try_again, Req1);
+	system_off ->
+	    generate_http_resp(system_off, Req1)
     end;
 api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, NameSpace, Cmd, State]),
@@ -189,7 +191,9 @@ api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
 	    true  -> 
             api_handle_command(Path, Req);
         try_again ->                    
-            generate_http_resp(try_again, Req1)
+            generate_http_resp(try_again, Req1);
+	system_off ->
+            generate_http_resp(system_off, Req1)
     end;
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
@@ -323,7 +327,7 @@ proc_object([ { <<"name">>, Name}])->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  binary_to_list(E).
+	  http_uri:decode(binary_to_list(E) ).
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
@@ -334,8 +338,9 @@ process_params(Aim, List)->
 	end.
 
 generate_prolog_msg(Req, Aim)->
-    {ok, PostVals, _Req2} = cowboy_req:body_qs(Req),
-    Post = proplists:get_value(<<"params">>, PostVals,undefined),
+    {ok, Body, _Req2} = cowboy_req:body(Req),
+    <<"params=",Post/binary>> = Body , 
+    %proplists:get_value(<<"params">>, PostVals,undefined),
     ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
     Json  = ( catch jsx:decode(Post) ),
     ?LOG_INFO("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
@@ -360,7 +365,7 @@ reload(NameSpace) ->
     case ets:lookup(?REQS_TABLE, NameSpace) of
         [{NameSpace, []}] ->
             prolog:delete_inner_structs(NameSpace),
-            fact_hbase:load_rules2ets(NameSpace),  
+            fact_hbase:load_rules2ets(NameSpace), 
             <<"true">>;
         _ ->
             spawn(fun() -> start_aside_reload(NameSpace) end),
@@ -380,26 +385,21 @@ start_aside_reload(NameSpace, _Any) ->
     start_aside_reload(NameSpace).
     
 %% Delete/ Insert Reqs
-insert_req(NameSpace, Session) ->
+insert_req(NameSpace, Req) ->
     case ets:lookup(?REQS_TABLE, NameSpace) of
-        [{NameSpace, SessionList}] ->
-            ets:insert(?REQS_TABLE, {NameSpace, [Session|SessionList]});
+        [{NameSpace, ReqsList}] ->
+            ets:insert(?REQS_TABLE, {NameSpace, [Req|ReqsList]});
         [] ->
-            ets:insert(?REQS_TABLE, {NameSpace, [Session]})
+            ets:insert(?REQS_TABLE, {NameSpace, [Req]})
     end.
 
-delete_req(NameSpace, Session) ->
+delete_req(NameSpace, Req) ->
     case ets:lookup(?REQS_TABLE, NameSpace) of
-        [{NameSpace, SessionList}] ->
-            NewSessionList = lists:delete(Session, SessionList),
-            ets:insert(?REQS_TABLE, {NameSpace, NewSessionList});
+        [{NameSpace, ReqsList}] ->
+            NewReqsList = lists:keydelete(Req, 1, ReqsList),
+            ets:insert(?REQS_TABLE, {NameSpace, NewReqsList});
         [] ->
             ok
     end.
 
-%% Statistic api
-requests_to_work() ->
-    ets:tab2list(?ERWS_LINK).
 
-processes_count() ->
-    length(ets:tab2list(proc_table)).

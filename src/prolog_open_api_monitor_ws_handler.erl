@@ -10,11 +10,11 @@
              
 ]).
 -export([   graph/2, 
-	    current_processes/2, 
 	    code_memory/2, 
 	    requests/2,
 	    namespaces/2,
-	    state_system/2
+	    system_state/2,
+            status/2
 ]).
 
 init({tcp, http}, _Req, _Opts) ->
@@ -31,8 +31,8 @@ websocket_handle({text, JSONRequest}, Req, State) ->
         Action = proplists:get_value(<<"action">>, Request),
         case erlang:apply(?MODULE, binary_to_existing_atom(Cmd, utf8), [Action, Request]) of
             {to_peer, Response} ->
-                JsonOkResponse = jsx:encode(Response),
-                io:format("Response: ~p~n", [JsonOkResponse]),
+	        JsonOkResponse = jsx:encode(Response),
+		io:format("Response: ~p~n", [JsonOkResponse]),
                 {reply, {text, JsonOkResponse}, Req, State};
             {to_all, Response} ->
                 JsonOkResponse = jsx:encode(Response),
@@ -51,38 +51,47 @@ websocket_info({send, Msg}, Req, State) ->
 websocket_terminate(_Reason, _Req, _State) ->
 	ok.
 
-%% Get namespaces
+%% External
+%% Get namespaces   ok
 namespaces(<<"get">>, Req) ->
-    NameSpaces = prolog_open_api_statistics:get_namespaces(),
-    io:format("Resoult get nameSpaces: ~p~n", [NameSpaces]),
+    {ok, NameSpaces} = prolog_open_api_statistics:get_namespaces(),
     {to_peer, lists:flatten([{<<"namespaces">>, NameSpaces}|Req])}.
 
-%% Get Graph Data
+%% Get Graph Data   ok
 graph(<<"get">>, Req) ->
-    NameSpace = proplists:get_value(<<"namespace">>, Req),
-    {ok, Data} = prolog_open_api_statistics:get_graph_data(binary_to_list(NameSpace)),
+    NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
+    {ok, Data} = prolog_open_api_statistics:get_graph_data(NameSpace),
+    io:format("graph_data: ~p~n", [Data]),
     {to_peer, lists:flatten([{<<"graph_data">>, Data}|Req])}.
 
-%% Get requests_to_work
+%% Get requests     ok
 requests(<<"get">>, Req) ->
-    {ok, Data} = prolog_open_api_statistics:get_requests("test"), 
-    {to_peer, lists:flatten([{<<"requests">>, Data}|Req])}.
+    NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
+    {ok, {Count, Data}} = prolog_open_api_statistics:get_requests(NameSpace),
+    io:format("requests count: ~p data: ~p~n", [Count, Data]),
+    {to_peer, lists:flatten([{<<"requests">>, Data}, {<<"count">>, Count}|Req])}.
 
-%% Get current processes
-current_processes(<<"get">>, Req) ->
-    {ok, Data} = prolog_open_api_statistics:get_processes(),
-    {to_peer, lists:flatten([{<<"processes">>, Data}|Req])}.
+%% Get statistic_system     ok
+system_state(<<"get">>, Req) ->
+    {ok, {Count, Data}} = prolog_open_api_statistics:get_system_state(),
+    io:format("system_state number: ~p data: ~p~n", [Count, Data]),
+    {ok, Memory} = prolog_open_api_statistics:get_memory(),
+    io:format("system_state memory: ~p~n", [Memory]),
+    {ok, Processes} = prolog_open_api_statistics:get_processes(), 
+    io:format("system_state processes: ~p~n", [Processes]),
+    Req1 = [{<<"count">>, Count},{<<"memory">>, Memory}, {<<"processes">>, Processes}|Req],
+    {to_peer, lists:flatten([{<<"system_state">>, Data}|Req1])}. 
 
-%% Get gen statistic_system (ets:tab2list(stat))
-state_system(<<"get">>, Req) ->
-    {ok, Data} = prolog_open_api_statistics:get_system_state(),
-    {to_peer, lists:flatten([{<<"processes">>, Data}|Req])}. 
+%% Show Api code   
+code_memory(<<"get">>, Req) ->
+    NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
+    {ok, Data} = prolog_open_api_statistics:get_code_memory(NameSpace),
+    {to_peer, lists:flatten([{<<"code_memory">>, Data}|Req])}.
 
-%% Show Api code
-code_memory(<<"get">>, _Req) ->
-    ok.
-
-
+status(<<"change">>, Req) ->
+    Value = list_to_atom(binary_to_list(proplists:get_value(<<"value">>, Req))),
+    true = ets:insert(system_state, {prolog_api, Value}),
+    {to_peer, lists:flatten([{<<"status">>, <<"changed">>}|Req])}.
 
 
 

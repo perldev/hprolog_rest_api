@@ -9,6 +9,7 @@
                     sasl,
                     lager,
                     crypto,
+                    mimetypes,
                     ranch,
                     cowboy,
                     compiler,
