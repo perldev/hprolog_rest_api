@@ -85,16 +85,27 @@ function switchSidebars(){
 
  
 var options = { chart: {
-            renderTo: 'graph',
+                renderTo: 'graph',
 	        type: 'bubble',
 	        zoomType: 'xy',
-            events: { load: eventData}
+                events: { load: eventData}
 	    },
         title: {
 	    	text: 'Counter Facts'
 	    },
+           
 	    legend: { enabled: false},
-	    series: [{name: FactName, data: genMassive()
+	    series: [{
+                    name: FactName, 
+                    dataLabels: {
+                            enabled: true,
+                            x:40,
+                            formatter:function() {
+                                return this.point.name;
+                            },
+                            style:{color:"black"}
+                    },
+                    data: genMassive()
 	}]
 }
 
