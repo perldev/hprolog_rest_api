@@ -98,7 +98,7 @@ var options = { chart: {
 	}]
 }
 
-// generate an array of random data
+// generate an array of random data to graph 1000 points
 function genMassive()  {
                     var data = [],
                     time = (new Date()).getTime(),i;
@@ -122,7 +122,6 @@ function eventData(){
 	console.log("cmd:", msg.cmd);
 	switch (msg.cmd){
 	    case "namespaces":
-            // Todo Purejs
 		    namespaces = msg.namespaces;
 		    console.log("namespaces:", namespaces);
 		    appendNamespaces(namespaces);
@@ -132,33 +131,33 @@ function eventData(){
             $.map( arrey, function(Point){
 		    FactName = Point.name;
 		    GraphData = Point.data;
-	    chart.series.update = {name: FactName};
+	        chart.series.update = {name: FactName};
             chart.series[0].addPoint(GraphData, true, true);
             });
 	    break
         case "requests":
             $("#requests_container").empty();
             requests = msg.requests;
-	    console.log("requests:", requests);
-	    $("#requests_container").append("<br/>");
+	        console.log("requests:", requests);
+	        $("#requests_container").append("<br/>");
             $("#requests_container").append("<div> Number Requests: " + msg.count + "</div>");
-	    $.map(requests, function(req1){
-	    $("#requests_container").append("<br/>");
-	    $("#requests_container").append("<div>" + req1.request + "</div>"); 
-	    });
+	        $.map(requests, function(req1){
+	        $("#requests_container").append("<br/>");
+	        $("#requests_container").append("<div>" + req1.request + "</div>"); 
+	        });
 	    break
         case "system_state":
             system_data = msg.system_state;
             $("#system_state_container").empty();
-	    $("#system_state_container").append("<br/>");
+	        $("#system_state_container").append("<br/>");
             $("#system_state_container").append("<div> Number Processes: "+ msg.processes + " Memory/mb: " + msg.memory + "</div>");
-	    $("#system_state_container").append("<br/>");
+	        $("#system_state_container").append("<br/>");
             $("#system_state_container").append("<div> Number Requests: " + msg.count + "</div>");
-	    requests = msg.system_state;
-	    $.map(requests, function(req1){
-		$("#system_state_container").append("<br/>");
-                $("#system_state_container").append("<div>" + req1.state + "</div>");
- 	    });
+	        requests = msg.system_state;
+	        $.map(requests, function(req1){
+		    $("#system_state_container").append("<br/>");
+            $("#system_state_container").append("<div>" + req1.state + "</div>");
+ 	        });
         break
         case "code_memory":
             code_memory_data = msg.code_memory;
