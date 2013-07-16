@@ -16,19 +16,6 @@
 get_code_memory(NameSpace) ->
     {ok, prolog_shell:get_code_memory_html(NameSpace)}.
 
-%Rules = ets:tab2list(common:get_logical_name(Prefix, ?RULES)),
-%    Meta = ets:tab2list( common:get_logical_name(Prefix, ?META)),        
-%	MetaCode = lists:foldl(fun( {Name,Count,_Hash}, In) ->
-%        LName = atom_to_list(Name),
-%	    LCount = integer_to_list(Count),
-%	    V2 = list_to_binary("<strong>"++LName++ "</strong> arity  - "++ LCount ++ ". <br/>") ,
-%	    <<In/binary, V2/binary>>
-%	end, <<>>, Meta  ),
-%    RulesCode = lists:foldl(fun process_inner_html/2, <<>> , Rules  ),
-%	FormatedCode1 = binary:replace(RulesCode,[<<" , ">>],<<"&nbsp;&nbsp;&nbsp;&nbsp;<strong>,</strong><br/>">>, [ global ] ),
-%	FormatedCode = binary:replace(FormatedCode1,[<<":-">>],<<"</strong>:-<br/>">>, [ global ] ),
-%	<< "<br/>", MetaCode/binary, FormatedCode/binary >>.
-
 get_memory() ->
     %%[Total, Proc, ProcUsed, System, Atom, AtomUsed, Binary, Code, Ets]
     [H|_T] = [round(Value/1048576) || {_, Value} <- erlang:memory()],
@@ -36,13 +23,6 @@ get_memory() ->
 
 % {{add, pay}, {true, 4, false, 1}}
 get_system_state() ->
-    %% Todo Remuve
-    L = [{{add, pay}, {true, 4, false, 1}},
-	{{search, pay2}, {true, 5, false, 0}},
-	{{hren, counter}, {true, 1, false, 3}}
-    ],
-    [ets:insert(?STAT, X) || X <- L],
-    %% 
     List = ets:tab2list(?STAT),
     JsonData = to_json_format(<<"state">>, List),
     {ok, {length(List), JsonData}}.
@@ -50,7 +30,6 @@ get_system_state() ->
 get_requests(NameSpace) ->
     Requests = ets:lookup(?REQS_TABLE, NameSpace),
     ReqList = proplists:get_value(NameSpace, Requests),
-    io:format("reqlist: ~p~n", [ReqList]),
     JsonReqs = to_json_format(<<"request">>, ReqList),
     {ok, {length(ReqList), JsonReqs}}.
 
@@ -115,6 +94,5 @@ to_json_format(_Key, [], Acc) ->
     lists:reverse(Acc);
 to_json_format(Key, [H|T], Acc) ->
     Term = io_lib:format("~p",[H]),
-    io:format("after io_lib: ~p~n", [Term]),
     BinTerm = list_to_binary(lists:flatten(Term)),
     to_json_format(Key, T, [[{Key, BinTerm}]|Acc]).
