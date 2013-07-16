@@ -36,13 +36,6 @@ get_memory() ->
 
 % {{add, pay}, {true, 4, false, 1}}
 get_system_state() ->
-    %% Todo Remuve
-    L = [{{add, pay}, {true, 4, false, 1}},
-	{{search, pay2}, {true, 5, false, 0}},
-	{{hren, counter}, {true, 1, false, 3}}
-    ],
-    [ets:insert(?STAT, X) || X <- L],
-    %% 
     List = ets:tab2list(?STAT),
     JsonData = to_json_format(<<"state">>, List),
     {ok, {length(List), JsonData}}.
