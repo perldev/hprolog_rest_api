@@ -34,7 +34,7 @@ get_requests(NameSpace) ->
     {ok, {length(ReqList), JsonReqs}}.
 
 get_namespaces() ->
-   {ok, [list_to_binary(X) || X  <- fact_hbase:get_list_namespaces(), X /= []]}.
+   {ok, [list_to_binary(X) || X  <- fact_hbase:get_list_namespaces()]}.
 
 get_processes() ->
     {ok, erlang:system_info(process_count)}.

@@ -181,6 +181,7 @@ handle_info({'DOWN',_,_,Pid,Reason}, State)->
     ?LOG_DEBUG("~p process  msg ~p  ~n", [{?MODULE,?LINE}, {Pid,Reason}]),
     ets:delete(State#monitor.proc_table, Pid),
     {noreply,  State};
+    
 handle_info(Info, State) ->
     ?LOG_DEBUG("get msg  unregistered msg ~p ~n", [Info]),
     {noreply,  State}.
