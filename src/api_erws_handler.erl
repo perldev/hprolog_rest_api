@@ -77,7 +77,6 @@ get_result(Session, NameSpace)->
 		exit(Pid, finish),
 		unexpected_error;	
 	[{_,_,SomeThing, ProtoType, _Time}] ->
-                delete_req(NameSpace, Session), 
                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
 	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
 	        VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
@@ -214,7 +213,7 @@ aim_next(Session, AtomNS) ->
     end.
 
 delete_session(Session, AtomNS) ->
-    true = ets:delete(AtomNS, Session),
+    delete_req(AtomNS, Session),  
     case ets:lookup(?ERWS_LINK, Session) of
 	    [{Session, Pid, _Status, _ProtoType, _StartTime}] ->
 	        ets:delete(?ERWS_LINK, Session),
