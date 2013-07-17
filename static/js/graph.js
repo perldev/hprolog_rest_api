@@ -1,10 +1,5 @@
 "use strict";
 
-$(document).ready(function() {
-     $('a').on('click', vm_statistic.events.pageChange);
-     $("a[id='button']").on('click', vm_statistic.events.buttonChange);
-    
-});
 
 var vm_statistic = {
     page: "graph",
