@@ -11,9 +11,9 @@ var page = "graph";
 var sideBarId;
 
 // need change host
-vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
+//vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
 
-// vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
+ vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
 
 vm_statistic.ws.onopen = function(evt){
     console.log("Socket open");
@@ -176,9 +176,8 @@ function eventData(){
     var arrey = [], GraphData = [], code_memory_data = [];
     vm_statistic.ws.onmessage = function(evt) { 
 	console.log("Received_msg:", evt.data);
-    var msg = JSON.parse(evt.data);
+        var msg = JSON.parse(evt.data);
 	console.log("cmd:", msg.cmd);
-       
 	switch (msg.cmd){
             
 	    case "namespaces":
@@ -189,6 +188,7 @@ function eventData(){
         case "graph":
             var Array = msg.graph_data;
             drawChart(Array);
+            unblock();
 	    break;
 
         case "requests":
@@ -252,7 +252,7 @@ function sendName(obj){
     case "graph":
         console.log("graph_page");
     	clearInterval(timerId);
-
+        block();
     	timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: page}))', 30000);
     break
     case "monitor":
@@ -276,5 +276,14 @@ function clear_sel_namespace(){
         $("span.btn-warning").removeClass("btn-warning").addClass("btn-info")
 
 }
+function block(){
+     $("#block").show()
+    
+}
+function unblock(){
+     $("#block").hide('fast')
+    
+}
+
 
 
