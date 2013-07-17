@@ -389,10 +389,11 @@ insert_req(NameSpace, SessionId) ->
     AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     true = ets:insert(AtomNS, {SessionId}).
 
-delete_req(NameSpace, SessionId) ->
+delete_req(NameSpace, SessionId) when is_atom(NameSpace)->
+    delete_req(atom_to_list(NameSpace), SessionId);
+delete_req(NameSpace, SessionId)->
     AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     ets:safe_fixtable(AtomNS, true),
     true = ets:delete(AtomNS, SessionId),
     ets:safe_fixtable(AtomNS, false).
-
 
