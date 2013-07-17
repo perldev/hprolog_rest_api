@@ -362,7 +362,7 @@ generate_session()->
 
 %% Check Reqs
 reload(NameSpace) ->
-    case proplists:get_value(size, ets:info(list_to_atom(NameSpace))) of
+    case proplists:get_value(size, ets:info(list_to_atom(?QUEUE_PREFIX ++ NameSpace))) of
         0 ->
             prolog:delete_inner_structs(NameSpace),
             fact_hbase:load_rules2ets(NameSpace), 
@@ -374,7 +374,7 @@ reload(NameSpace) ->
     end.   
 
 start_aside_reload(NameSpace) ->
-    AtomNS = list_to_atom(NameSpace),
+    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     start_aside_reload(NameSpace, proplists:get_value(size, ets:info(AtomNS))).
 
 start_aside_reload(NameSpace, 0) ->
@@ -387,11 +387,11 @@ start_aside_reload(NameSpace, _Any) ->
     
 %% Delete/ Insert Reqs
 insert_req(NameSpace, SessionId) ->
-    AtomNS = list_to_atom(NameSpace),
+    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     true = ets:insert(AtomNS, {SessionId}).
 
 delete_req(NameSpace, SessionId) ->
-    AtomNS = list_to_atom(NameSpace),
+    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     ets:safe_fixtable(AtomNS, true),
     true = ets:delete(AtomNS, SessionId),
     ets:safe_fixtable(AtomNS, false).

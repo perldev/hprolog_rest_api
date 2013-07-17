@@ -36,7 +36,7 @@ init([]) ->
 	ListNS = fact_hbase:get_list_namespaces(),
 	[begin 
 	    Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
-            ets:new("queue_"++list_to_atom(X), Opts)
+            ets:new(list_to_atom(?QUEUE_PREFIX++X), Opts)
 	end|| X <- ListNS],
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, []),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),

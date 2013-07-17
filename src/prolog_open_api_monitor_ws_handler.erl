@@ -1,6 +1,7 @@
 -module(prolog_open_api_monitor_ws_handler).
 -author('Vitaly Kletsko <v.kletsko@gmail.com>').
 -behaviour(cowboy_websocket_handler).
+-include("open_api.hrl").
 
 -export([   init/3,
             websocket_init/3,
@@ -67,7 +68,7 @@ graph(<<"get">>, Req) ->
 
 %% Get requests     ok
 requests(<<"get">>, Req) ->
-    NameSpace = list_to_atom(binary_to_list(proplists:get_value(<<"namespace">>, Req))),
+    NameSpace = list_to_atom(?QUEUE_PREFIX ++ binary_to_list(proplists:get_value(<<"namespace">>, Req))),
     {ok, {Count, Data}} = prolog_open_api_statistics:get_requests(NameSpace),
     %%io:format("requests count: ~p data: ~p~n", [Count, Data]),
     {to_peer, lists:flatten([{<<"requests">>, Data}, {<<"count">>, Count}|Req])}.

@@ -26,3 +26,4 @@
 -define(REGISTERED_NAMESPACE, "namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
 
+-define(QUEUE_PREFIX,"queue").

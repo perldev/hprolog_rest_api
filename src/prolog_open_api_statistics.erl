@@ -46,9 +46,37 @@ get_namespaces() ->
 
 get_processes() ->
     {ok, erlang:system_info(process_count)}.
-
-%%TODO   
-get_graph_data(NameSpace) ->
+    
+    
+ets_get_keys(Table)->
+    Key  = ets:first(Table),
+    ets_get_keys(Key, Table, []).
+ 
+ets_get_keys('$end_of_table', _Table, Acum)->
+    Acum;
+ets_get_keys(Key, Table, Acum)->
+    case catch ets:next(Table, Key) of
+        '$end_of_table' -> [Key| Acum];
+        {'EXIT', _Reason} ->
+            NextKey = ets:first(Table),
+            ets_get_keys(NextKey, Table, [Key|Acum]);
+        NextKey ->
+            ets_get_keys(NextKey, Table, [Key|Acum])
+    end
+.
+        
+        
+get_graph_data(NameSpace)->
+     case catch ets:first(common:get_logical_name(NameSpace, ?META) ) of
+        {'EXIT', _Reason}->
+            get_graph_data_low(NameSpace);
+         _->
+            get_graph_data_ets(NameSpace)
+     end
+     
+.
+        
+get_graph_data_low(NameSpace) ->
     MetaTable = common:get_logical_name(NameSpace, ?META_FACTS),
     MetaInfo = fact_hbase:create_hbase_family_filter(?STAT_FAMILY),
     ScannerMetaInfo = fact_hbase:generate_scanner(5000,  MetaInfo),
@@ -67,9 +95,25 @@ hbase_get_keys(JsonData) ->
         binary_to_list(base64:decode(RowName64))
     end || Row <- Values].
 
+% 
+        
+        
+        
+%%TODO   
+get_graph_data_ets(NameSpace) ->
+    KeyList = ets_get_keys( common:get_logical_name(NameSpace, ?META) ),
+    KeyList1 = ets_get_keys( common:get_logical_name(NameSpace, ?RULES) ),    
+    ?DEBUG("Keys ~p~n", [ KeyList ++ KeyList1 ]),
+    MetaTable = common:get_logical_name(NameSpace, ?META_FACTS), 
+    Keys = lists:map(fun(E)-> atom_to_list(E) end,  KeyList ++ KeyList1),
+    {ok, prepare_data( Keys, MetaTable)}.
+
+    
+    
 prepare_data(KeyList, MetaTable) ->
     prepare_data(KeyList, [], MetaTable).
 
+    
 prepare_data([], Acc, _MetaTable) -> Acc;
 prepare_data([Key|Rest], Acc, MetaTable) ->
     try
