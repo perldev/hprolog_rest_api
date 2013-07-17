@@ -33,14 +33,19 @@ init([]) ->
 	ets:new(system_state, [named_table, public]),
 	ets:insert(system_state, {prolog_api, on}),  
 	{NameSpace, Registered } = load_tables(),
+	ListNS = fact_hbase:get_list_namespaces(),
+	[begin 
+	    Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
+            ets:new(list_to_atom(X), Opts)
+	end|| X <- ListNS],
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, []),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(1000, ?MODULE, load_auth_info, []),
         {ok, #monitor {
-                            registered_namespaces = NameSpace,
-                            registered_ip = Registered,
-                            auth_info = Auth,
-                            proc_table = ets:new( proc_table, [named_table ,public ,set] 
+                        registered_namespaces = NameSpace,
+                        registered_ip = Registered,
+                        auth_info = Auth,
+                        proc_table = ets:new( proc_table, [named_table ,public ,set] 
         )}}.
 
         
@@ -109,14 +114,14 @@ low_auth(State, Ip, NameSpace)->
     end.
 
 start_namespace(State, NameSpace, Ip)->
-	EtsRegis = State#monitor.registered_ip,
-  	EtsNameSpace = State#monitor.registered_namespaces,
-	ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
-    	ets:insert(?REQS_TABLE, {NameSpace, []}),
+    EtsRegis = State#monitor.registered_ip,
+    EtsNameSpace = State#monitor.registered_namespaces,
+    ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
+    ets:new(list_to_atom(NameSpace), [named_table, public, {write_concurrency,true}, {read_concurrency,true}]), %%For statistic
 	case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
                 prolog_shell:api_start(NameSpace),
-		ets:insert(EtsNameSpace,  {NameSpace, now()}),
+		        ets:insert(EtsNameSpace,  {NameSpace, now()}),
 		true;
 	    _-> true
 	end.

@@ -25,5 +25,4 @@
 -define(REGISTERED_FILE, "registered.ets" ).
 -define(REGISTERED_NAMESPACE, "namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
--define(REQS_TABLE, reqs_table).
 

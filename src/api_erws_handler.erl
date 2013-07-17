@@ -28,9 +28,8 @@ handle(Req, State) ->
 
 start_link_session(Session, SourceMsg, NameSpace) ->
     Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
-    Req = {Session, Pid, wait, SourceMsg, now()},
-    insert_req(NameSpace, Req),
-    ets:insert(?ERWS_LINK, Req),       
+    insert_req(NameSpace, Session),
+    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now()}),       
     ok.
      	
 start_new_aim(Msg, NameSpace) when is_tuple(Msg) ->
@@ -68,20 +67,20 @@ get_result(Session, NameSpace)->
 	[{_, _Pid, wait, _ProtoType, _Time}] ->
 		result_not_ready;
 	[{_, Pid, false, _ProtoType, _Time}] ->
-        delete_req(NameSpace, Session),
+                delete_req(NameSpace, Session),
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		false;
 	[{_, Pid, unexpected_error, _ProtoType, _Time  } ]->
-        delete_req(NameSpace, Session),
+                delete_req(NameSpace, Session),
 		ets:delete(?ERWS_LINK, Session),
 		exit(Pid, finish),
 		unexpected_error;	
 	[{_,_,SomeThing, ProtoType, _Time}] ->
-        delete_req(NameSpace, Session), 
-        {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
-		?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
-		VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
+                delete_req(NameSpace, Session), 
+                {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
+	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
+	        VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
 		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
 
@@ -146,15 +145,15 @@ api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
     ?LOG_INFO(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session), binary_to_list(NameSpace)),
     generate_http_resp(Result, Req);
-api_handle_command([<<"finish">>, _NameSpace, Session], Req) ->
+api_handle_command([<<"finish">>, NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-     generate_http_resp( delete_session(binary_to_list(Session)), Req);
-api_handle_command([<<"next">>, _NameSpace, Session], Req) ->
+     generate_http_resp(delete_session(binary_to_list(Session), list_to_atom(binary_to_list(NameSpace))), Req);
+api_handle_command([<<"next">>, NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-     Result = aim_next(binary_to_list( Session)),
-     generate_http_resp(Result, Req);
+    Result = aim_next(binary_to_list(Session), list_to_atom(binary_to_list(NameSpace))),
+    generate_http_resp(Result, Req);
 api_handle_command(Path, Req) ->
     ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
      generate_http_resp(not_found, Req).
@@ -199,12 +198,12 @@ api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
      generate_http_resp(not_found, Req).
 
-aim_next(Session) ->
+aim_next(Session, AtomNS) ->
     case ets:lookup(?ERWS_LINK, Session) of
 	    [{Session, _Pid, wait, _ProtoType,_StartTime}] ->
 	        aim_in_process;
 	    [{Session, _Pid, Res, _ProtoType,_StartTime}] when is_atom(Res) ->
-	        delete_session(Session),
+	        delete_session(Session, AtomNS),
 	        Res;
 	    [{Session, Pid, Res, ProtoType, StartTime}] when is_tuple(Res) ->
 	        Pid ! {some_code, next},
@@ -214,15 +213,16 @@ aim_next(Session) ->
 	        not_found
     end.
 
-delete_session(Session) ->
+delete_session(Session, AtomNS) ->
+    true = ets:delete(AtomNS, Session),
     case ets:lookup(?ERWS_LINK, Session) of
 	    [{Session, Pid, _Status, _ProtoType, _StartTime}] ->
 	        ets:delete(?ERWS_LINK, Session),
 	        Pid ! {some_code, finish} ,
 	        true;
 	    []->
-		    ?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session]),
-		    not_found
+		?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session]),
+		not_found
 	end.
  
 process_req(Session, Msg)->
@@ -357,13 +357,13 @@ generate_session()->
     {MSecs, Secs, MiSecs} = erlang:now(),
     %this is not the perfect fast procedure but it work in thread cause this
     % im do not want to rewrite it 
-    Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[ MSecs, Secs, MiSecs])), %reference has only 14 symbols
+    Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[MSecs, Secs, MiSecs])), %reference has only 14 symbols
     Res.
 
 %% Check Reqs
 reload(NameSpace) ->
-    case ets:lookup(?REQS_TABLE, NameSpace) of
-        [{NameSpace, []}] ->
+    case proplists:get_value(size, ets:info(list_to_atom(NameSpace))) of
+        0 ->
             prolog:delete_inner_structs(NameSpace),
             fact_hbase:load_rules2ets(NameSpace), 
             <<"true">>;
@@ -374,9 +374,10 @@ reload(NameSpace) ->
     end.   
 
 start_aside_reload(NameSpace) ->
-    start_aside_reload(NameSpace, ets:lookup(?REQS_TABLE, NameSpace)).
+    AtomNS = list_to_atom(NameSpace),
+    start_aside_reload(NameSpace, proplists:get_value(size, ets:info(AtomNS))).
 
-start_aside_reload(NameSpace, [{NameSpace, []}]) ->
+start_aside_reload(NameSpace, 0) ->
     prolog:delete_inner_structs(NameSpace),
     fact_hbase:load_rules2ets(NameSpace),
     ok;
@@ -385,21 +386,14 @@ start_aside_reload(NameSpace, _Any) ->
     start_aside_reload(NameSpace).
     
 %% Delete/ Insert Reqs
-insert_req(NameSpace, Req) ->
-    case ets:lookup(?REQS_TABLE, NameSpace) of
-        [{NameSpace, ReqsList}] ->
-            ets:insert(?REQS_TABLE, {NameSpace, [Req|ReqsList]});
-        [] ->
-            ets:insert(?REQS_TABLE, {NameSpace, [Req]})
-    end.
+insert_req(NameSpace, SessionId) ->
+    AtomNS = list_to_atom(NameSpace),
+    true = ets:insert(AtomNS, {SessionId}).
 
-delete_req(NameSpace, Req) ->
-    case ets:lookup(?REQS_TABLE, NameSpace) of
-        [{NameSpace, ReqsList}] ->
-            NewReqsList = lists:keydelete(Req, 1, ReqsList),
-            ets:insert(?REQS_TABLE, {NameSpace, NewReqsList});
-        [] ->
-            ok
-    end.
+delete_req(NameSpace, SessionId) ->
+    AtomNS = list_to_atom(NameSpace),
+    ets:safe_fixtable(AtomNS, true),
+    true = ets:delete(AtomNS, SessionId),
+    ets:safe_fixtable(AtomNS, false).
 
 

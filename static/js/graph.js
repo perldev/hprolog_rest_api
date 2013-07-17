@@ -17,6 +17,7 @@ vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
 
 vm_statistic.ws.onopen = function(evt){
     console.log("Socket open");
+    $("#hero_unit").hide();
     $("#monitor_menu").hide();
     eventData();
     vm_statistic.ws.send(JSON.stringify({action: "get", cmd: "namespaces"}));
@@ -39,6 +40,7 @@ vm_statistic.events.pageChange = function(evt){
         emptyInstance();
         clearInterval(timerId);
         $("#monitor_menu").hide();
+        $("#hero_unit").hide();
         $("#namespaces").show();
         $("#graph").show(); 
 	    console.log("load graph_page");
@@ -48,6 +50,7 @@ vm_statistic.events.pageChange = function(evt){
         clearInterval(timerId);
         $("#graph").hide();
         $("#namespaces").show();
+        $("#hero_unit").show();
         $("#monitor_menu").show();
         sideBarId = "requests"; 
         console.log("load monitor_page");
@@ -88,6 +91,7 @@ function switchSidebars(){
 }
 
  
+<<<<<<< HEAD
 // var options = { chart: {
 //                 renderTo: 'graph',
 // 	        type: 'bubble',
@@ -164,6 +168,34 @@ function drawChart(Array){
        var chart = new google.visualization.BubbleChart(document.getElementById('graph'));
        chart.draw(data, options);      
     
+=======
+var options = { chart: {
+            renderTo: 'graph',
+	        type: 'bubble',
+	        zoomType: 'xy',
+            events: { load: eventData}
+	    },
+        title: {
+	    	text: 'Counter Facts'
+	    },
+	    legend: { enabled: false},
+	    series: [{name: FactName, data: genMassive()
+	}]
+}
+
+// generate an array of random data to graph 1000 points
+function genMassive()  {
+                    var data = [],
+                    time = (new Date()).getTime(),i;
+                    for (i = -50; i <= 0; i++) {
+                        data.push({
+                            x: Math.floor((Math.random()*100)+1),
+                            y: Math.floor((Math.random()*100)+1),
+                            z: Math.floor((Math.random()*100)+1),
+                        });
+                    }
+                    return data;
+>>>>>>> 32f3334aa6f79217b4ab8e59e979d7fa09f04655
 }
 
 
@@ -183,9 +215,19 @@ function eventData(){
 		    appendNamespaces(namespaces);
 	    break
         case "graph":
+<<<<<<< HEAD
             var Array = msg.graph_data;
             drawChart(Array);
 	    break;
+=======
+            arrey = msg.graph_data;
+            $.map( arrey, function(Point){
+		    //FactName = Point.name;
+		    GraphData = Point.data;
+            chart.series[0].addPoint(GraphData, true, true);
+            });
+	    break
+>>>>>>> 32f3334aa6f79217b4ab8e59e979d7fa09f04655
         case "requests":
             $("#requests_container").empty();
             requests = msg.requests;
@@ -247,9 +289,13 @@ function sendName(obj){
     case "graph":
         console.log("graph_page");
     	clearInterval(timerId);
+<<<<<<< HEAD
     	timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: page}))', 3000);
         
         
+=======
+    	timerId = setInterval('vm_statistic.ws.send(JSON.stringify({action: "get", namespace: NameSpace, cmd: page}))', 30000);
+>>>>>>> 32f3334aa6f79217b4ab8e59e979d7fa09f04655
     break
     case "monitor":
 	    console.log("requests_page");
