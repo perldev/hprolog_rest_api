@@ -229,9 +229,9 @@ var vm_statistic = {
 
 
 // need change host
-//vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
+vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
 
-vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
+// vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
 vm_statistic.ws.onopen = function(evt){
     console.log("Socket open");
     $("#hero_unit").hide();
