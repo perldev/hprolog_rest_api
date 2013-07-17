@@ -133,10 +133,32 @@
       google.load("visualization", "1", {packages:["corechart"]});
       
         $(document).ready(function() {
+                    
+        // need change host
+        vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
+
+        // vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
+        vm_statistic.ws.onopen = function(evt){
+            console.log("Socket open");
+            $("#hero_unit").hide();
+            $("#monitor_menu").hide();
+            vm_statistic.eventData();
+            vm_statistic.ws.send(JSON.stringify({action: "get", cmd: "namespaces"}));
+            
+        }
+        vm_statistic.ws.onclose = function(){
+            console.log("Socket closed"); 
+        }
+
+            
+            
             $('a').on('click', vm_statistic.events.pageChange);
             $("a[id='button']").on('click', vm_statistic.events.buttonChange);
             
+            
         });
+        
+        
     </script>
 <!--     <script src="js/lib/highcharts.js" type="text/javascript"></script> -->
 <!--    <script src="js/lib/highcharts-more.js" type="text/javascript"></script> -->

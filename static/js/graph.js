@@ -228,22 +228,6 @@ var vm_statistic = {
 
 
 
-// need change host
-vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
-
-// vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
-vm_statistic.ws.onopen = function(evt){
-    console.log("Socket open");
-    $("#hero_unit").hide();
-    $("#monitor_menu").hide();
-    vm_statistic.eventData();
-    vm_statistic.ws.send(JSON.stringify({action: "get", cmd: "namespaces"}));
-    
-}
-vm_statistic.ws.onclose = function(){
-    console.log("Socket closed"); 
-}
-
 
 
 
