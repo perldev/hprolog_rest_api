@@ -31,11 +31,12 @@ websocket_handle({text, JSONRequest}, Req, State) ->
         Action = proplists:get_value(<<"action">>, Request),
         case erlang:apply(?MODULE, binary_to_existing_atom(Cmd, utf8), [Action, Request]) of
             {to_peer, Response} ->
-	        JsonOkResponse = jsx:encode(Response),
-		io:format("Response: ~p~n", [JsonOkResponse]),
+	            JsonOkResponse = jsx:encode(Response),
+		        io:format("To Peer Response: ~p~n", [JsonOkResponse]),
                 {reply, {text, JsonOkResponse}, Req, State};
             {to_all, Response} ->
                 JsonOkResponse = jsx:encode(Response),
+                io:format("To All Response: ~p~n", [JsonOkResponse]),
                 self() ! {send, JsonOkResponse},
                 {ok, Req, State}
         end
@@ -61,24 +62,24 @@ namespaces(<<"get">>, Req) ->
 graph(<<"get">>, Req) ->
     NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
     {ok, Data} = prolog_open_api_statistics:get_graph_data(NameSpace),
-    io:format("graph_data: ~p~n", [Data]),
+    %%io:format("graph_data: ~p~n", [Data]),
     {to_peer, lists:flatten([{<<"graph_data">>, Data}|Req])}.
 
 %% Get requests     ok
 requests(<<"get">>, Req) ->
-    NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
+    NameSpace = list_to_atom(binary_to_list(proplists:get_value(<<"namespace">>, Req))),
     {ok, {Count, Data}} = prolog_open_api_statistics:get_requests(NameSpace),
-    io:format("requests count: ~p data: ~p~n", [Count, Data]),
+    %%io:format("requests count: ~p data: ~p~n", [Count, Data]),
     {to_peer, lists:flatten([{<<"requests">>, Data}, {<<"count">>, Count}|Req])}.
 
 %% Get statistic_system     ok
 system_state(<<"get">>, Req) ->
     {ok, {Count, Data}} = prolog_open_api_statistics:get_system_state(),
-    io:format("system_state number: ~p data: ~p~n", [Count, Data]),
+    %%io:format("system_state number: ~p data: ~p~n", [Count, Data]),
     {ok, Memory} = prolog_open_api_statistics:get_memory(),
-    io:format("system_state memory: ~p~n", [Memory]),
+    %%io:format("system_state memory: ~p~n", [Memory]),
     {ok, Processes} = prolog_open_api_statistics:get_processes(), 
-    io:format("system_state processes: ~p~n", [Processes]),
+    %%io:format("system_state processes: ~p~n", [Processes]),
     Req1 = [{<<"count">>, Count},{<<"memory">>, Memory}, {<<"processes">>, Processes}|Req],
     {to_peer, lists:flatten([{<<"system_state">>, Data}|Req1])}. 
 

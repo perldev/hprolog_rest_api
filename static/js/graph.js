@@ -17,6 +17,7 @@ vm_statistic.ws = new WebSocket("ws://avias-db-2.ceb.loc:8313/websocket");
 
 vm_statistic.ws.onopen = function(evt){
     console.log("Socket open");
+    $("#hero_unit").hide();
     $("#monitor_menu").hide();
     vm_statistic.ws.send(JSON.stringify({action: "get", cmd: "namespaces"}));
 }
@@ -36,6 +37,7 @@ vm_statistic.events.pageChange = function(evt){
         emptyInstance();
         clearInterval(timerId);
         $("#monitor_menu").hide();
+        $("#hero_unit").hide();
         $("#namespaces").show();
         $("#graph").show(); 
 	    console.log("load graph_page");
@@ -45,6 +47,7 @@ vm_statistic.events.pageChange = function(evt){
         clearInterval(timerId);
         $("#graph").hide();
         $("#namespaces").show();
+        $("#hero_unit").show();
         $("#monitor_menu").show();
         sideBarId = "requests"; 
         console.log("load monitor_page");

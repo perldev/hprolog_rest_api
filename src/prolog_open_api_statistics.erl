@@ -27,14 +27,22 @@ get_system_state() ->
     JsonData = to_json_format(<<"state">>, List),
     {ok, {length(List), JsonData}}.
 
-get_requests(NameSpace) ->
-    Requests = ets:lookup(?REQS_TABLE, NameSpace),
-    ReqList = proplists:get_value(NameSpace, Requests),
+get_requests(AtomNS) ->
+    ReqList = make_requests(AtomNS),
     JsonReqs = to_json_format(<<"request">>, ReqList),
     {ok, {length(ReqList), JsonReqs}}.
 
+make_requests(AtomNS) ->
+    make_requests(ets:tab2list(AtomNS), []).
+
+make_requests([], Acc) ->
+    lists:reverse(Acc);
+make_requests([{Session}|T], Acc) ->
+    Req = ets:lookup(?ERWS_LINK, Session),
+    make_requests(T, [Req|Acc]).
+    
 get_namespaces() ->
-   {ok, [list_to_binary(X) || X  <- fact_hbase:get_list_namespaces(), X /= []]}.
+   {ok, [list_to_binary(X) || X <- fact_hbase:get_list_namespaces()]}.
 
 get_processes() ->
     {ok, erlang:system_info(process_count)}.
@@ -77,7 +85,7 @@ prepare_data([Key|Rest], Acc, MetaTable) ->
         end
     catch
         _:Reason ->
-            ?DEBUG("Warning low_get_key: ~p~n", [Reason]),
+            ?LOG_DEBUG("Warning low_get_key: ~p~n", [Reason]),
             prepare_data(Rest, Acc, MetaTable)
     end.
 
