@@ -12,7 +12,7 @@
             cache_connections/0,
             change_status/3,
             load_auth_info/0,
-            check_expired_sessions/0]).
+            check_expired_sessions/1]).
 
 
 -record(monitor,{
@@ -34,12 +34,15 @@ init([]) ->
 	ets:insert(system_state, {prolog_api, on}),  
 	{NameSpace, Registered } = load_tables(),
 	ListNS = fact_hbase:get_list_namespaces(),
-	[begin 
-	    Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
-            ets:new(list_to_atom(?QUEUE_PREFIX++X), Opts)
-	end|| X <- ListNS],
-        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, []),
+	ListNSA =
+            [begin 
+                Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
+                AtomName = list_to_atom(?QUEUE_PREFIX++X),
+                ets:new(AtomName, Opts),AtomName 
+            end|| X <- ListNS],
+        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
+       
         timer:apply_after(1000, ?MODULE, load_auth_info, []),
         {ok, #monitor {
                         registered_namespaces = NameSpace,
@@ -75,6 +78,8 @@ load_tables()->
 			        _ -> 
 			            ets:new(registered_namespaces , [named_table ,public ,set])
 	end,
+
+	
         {NameSpace, Registered}.      
 
 code_change(_OldVsn, State, _Extra) ->
@@ -229,7 +234,7 @@ check_system_state() ->
 change_status(Ip, NameSpace, Status) ->
     gen_server:cast(?MODULE, {change_status, Ip, NameSpace, Status}).
     
-check_expired_sessions()->
+check_expired_sessions( NameSpaces )->
      {ok, ExpiredMiliSeconds} =  application:get_env(prolog_open_api, live_time_session),
      Now = now(),
      Fun  = fun(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key)->   
@@ -244,8 +249,31 @@ check_expired_sessions()->
                                     ets:next(Table, Key)
                             end
               end,
+   
     NewKey = ets:first(?ERWS_LINK),
-    check_expired_key(NewKey, Fun, ?ERWS_LINK).
+    check_expired_key(NewKey, Fun, ?ERWS_LINK),
+    lists:foreach(fun clean_not_actual/1, NameSpaces)
+.
+
+
+clean_not_actual(NameSpace)->
+    Key  = ets:first(NameSpace),    
+    clean_not_actual(Key, NameSpace )
+.
+clean_not_actual('$end_of_table', _AtomNS) ->
+    true;
+clean_not_actual(Key, AtomNS) ->
+    Req = ets:lookup(?ERWS_LINK, Key),
+    case  Req of
+        [] -> 
+            ets:delete(AtomNS, Key),
+            clean_not_actual(ets:first(AtomNS), AtomNS);
+        _->
+            clean_not_actual(ets:next(AtomNS, Key), AtomNS)
+    end
+.
+
+  
 
 check_expired_key('$end_of_table', _Fun,  _Table )->
     finish;

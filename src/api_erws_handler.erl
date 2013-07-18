@@ -185,13 +185,13 @@ api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
     case auth_demon:check_auth(Ip, NameSpace) of
 	    false -> 
-            generate_http_resp(permissions_denied, Req1);
+                generate_http_resp(permissions_denied, Req1);
 	    true  -> 
-            api_handle_command(Path, Req);
+                api_handle_command(Path, Req);
         try_again ->                    
-            generate_http_resp(try_again, Req1);
+                generate_http_resp(try_again, Req1);
 	system_off ->
-            generate_http_resp(system_off, Req1)
+                generate_http_resp(system_off, Req1)
     end;
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
@@ -394,6 +394,9 @@ delete_req(NameSpace, SessionId) when is_atom(NameSpace)->
 delete_req(NameSpace, SessionId)->
     AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     ets:safe_fixtable(AtomNS, true),
-    true = ets:delete(AtomNS, SessionId),
+    case catch ets:delete(AtomNS, SessionId) of
+        true-> do_nothing;
+        Reason ->?API_LOG("~p UNEXPECTED delete from queue ~p",[{?MODULE,?LINE}, {AtomNS, SessionId, Reason}])
+    end,
     ets:safe_fixtable(AtomNS, false).
 

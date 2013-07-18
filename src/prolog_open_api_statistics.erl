@@ -36,7 +36,7 @@ make_requests(AtomNS) ->
     make_requests(ets:tab2list(AtomNS), []).
 
 make_requests([], Acc) ->
-    lists:reverse(Acc);
+    Acc;
 make_requests([{Session}|T], Acc) ->
     Req = ets:lookup(?ERWS_LINK, Session),
     make_requests(T, [Req|Acc]).
