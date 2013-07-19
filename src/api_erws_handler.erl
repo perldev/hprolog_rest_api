@@ -317,7 +317,7 @@ result(R) when  is_binary(R) ->
 result(R)  ->
     list_to_binary ( lists:flatten( io_lib:format("~p",[R]) ) ).
 
-
+%%NOT ALLOW cyrrilic names
 proc_object([{<<"atom">>, Name }])->
     list_to_atom( binary_to_list(Name));  
 proc_object([ { <<"name">>, Name}])->
@@ -326,7 +326,9 @@ proc_object([ { <<"name">>, Name}])->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  http_uri:decode(binary_to_list(E) ).
+	  List = http_uri:decode(binary_to_list(E) ),
+	  unicode:characters_to_list( list_to_binary(List) ).
+	  
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
