@@ -21,7 +21,6 @@ handle(Req, State) ->
      {Path, Req1} = cowboy_req:path_info(Req),
      ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
-      ?DEV_DEBUG("~p call date function with ~p",[{?MODULE,?LINE},{In, Type, Accum}]),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
      {ok, NewReq, State}.
