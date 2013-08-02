@@ -21,6 +21,7 @@ handle(Req, State) ->
      {Path, Req1} = cowboy_req:path_info(Req),
      ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
+      ?DEV_DEBUG("~p call date function with ~p",[{?MODULE,?LINE},{In, Type, Accum}]),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
      {ok, NewReq, State}.
@@ -133,12 +134,12 @@ api_handle_command([<<"reload">>, BinNameS], Req) ->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
 api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
-    Msg = generate_prolog_msg(Req, Aim),
+    {Msg, Req3} = generate_prolog_msg(Req, Aim),
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, binary_to_list(NameSpace)),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
-	Response, Req);
+	Response, Req3);
 api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
@@ -187,7 +188,7 @@ api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
 	    false -> 
                 generate_http_resp(permissions_denied, Req1);
 	    true  -> 
-                api_handle_command(Path, Req);
+                api_handle_command(Path, Req1);
         try_again ->                    
                 generate_http_resp(try_again, Req1);
 	system_off ->
@@ -326,7 +327,8 @@ proc_object([ { <<"name">>, Name}])->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  List = http_uri:decode(binary_to_list(E) ),
+          NewE = binary:replace(E, [<<"+">>],<<" ">>,[global]), 
+	  List = http_uri:decode(binary_to_list(NewE) ),
 	  unicode:characters_to_list( list_to_binary(List) ).
 	  
 
@@ -339,7 +341,7 @@ process_params(Aim, List)->
 	end.
 
 generate_prolog_msg(Req, Aim)->
-    {ok, Body, _Req2} = cowboy_req:body(Req),
+    {ok, Body, Req2} = cowboy_req:body(Req),
     <<"params=",Post/binary>> = Body , 
     %proplists:get_value(<<"params">>, PostVals,undefined),
     ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
@@ -348,10 +350,10 @@ generate_prolog_msg(Req, Aim)->
 %    jsx:decode(<<"[1,{\"name\":1}]">>).
 %    [1,[{<<"name">>,1}]]
     case Json of
-	    {'EXIT', _ } -> error;
+	    {'EXIT', _ } -> {error, Req2};
 	    List when is_list(List)->
-	        process_params(Aim, List);
-	    _-> error
+	        {process_params(Aim, List), Req2};
+	    _-> {error, Req2}
     end.
 
 generate_session()->
