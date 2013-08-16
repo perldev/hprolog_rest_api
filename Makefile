@@ -10,7 +10,9 @@ compile:
 	@$(REBAR) compile
 
 clean:
+	
 	@$(REBAR) clean
+	rm -Rf deps
 
 tests: eunit ct
 
