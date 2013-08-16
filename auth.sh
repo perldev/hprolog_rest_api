@@ -1,6 +1,6 @@
 #!/bin/sh
 
-curl -d ""    http://127.0.0.1:8313/prolog/auth/p24
+curl -d ""    http://127.0.0.1:8080/prolog/auth/p24
 
 #curl -d"data={\"site\":\"http:\/\/climb.dp.ua\",\"title\":\"bogdan\",\"login\":\"none2\",\"password\":\"bezumie\",\"user_ip\":\"127.0.0.1\",\"email\":\"perldev@mail.ru\"}"    http://127.0.0.1:8086/api/registration/new
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 
      
-curl -d "params=[\"_P24test4477854708018\",\"TDNHE\",\"13.1\",\"UAH\",\"first test sender account\",\"4405882311725711\",\"0716\",\"+380663060686\",\"first receiver account name\",\"5211537329947530\",\"0716\",\"380663060686\",\"380269\",\"2807903329\",\"test details\",\"159.224.129.106\" ]"   http://127.0.0.1:8313/prolog/create/p24/new_pay_req
+curl -d "params=[\"_P24test4477854708018\",\"TDNHE\",\"13.1\",\"UAH\",\"first test sender account\",\"4405882311725711\",\"0716\",\"+380663060686\",\"first receiver account name\",\"5211537329947530\",\"0716\",\"380663060686\",\"380269\",\"2807903329\",\"test details\",\"159.224.129.106\" ]"   http://127.0.0.1:8080/prolog/create/p24/new_pay_req
 
 
 
