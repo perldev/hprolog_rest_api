@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+NODE=dev_api
+HOST=localhost.localdomain
+APP=prolog_open_api
+EBIN_DIR=ebin
+HOME_D=deps
+
+HOME_P="-pa $EBIN_DIR  $HOME_D/*/ebin  erl-prolog/ebin/ "
+#DOTTED=` | grep '\.'`
+TYPE="name"
+RUNUSER='hpro'
+ERL="erl +A 4 +K true -Q 10000000 +P 500000 -env  ERL_MAX_ETS_TABLES 10000" #-config siteheart"
+
+if [ "$USER" != $RUNUSER ]; then
+        ERL="sudo -u $RUNUSER $ERL"
+        sudo chown -R $RUNUSER:$RUNUSER .
+fi  
+ 
+
+#-sname dev \
+#   -config sys \
+#       -s prolog_open_api
+start()
+{
+	echo "starting Erlang visor Server"
+	LC_CTYPE=en_US.UTF-8\
+	$ERL \
+	$HOME_P \
+	-kernel error_logger false \
+	-noinput -detached \
+	-boot start_sasl \
+	-s $APP  \
+	-config sys \
+	-$TYPE $NODE@$HOST
+}
+start_debug(){
+	echo "starting debug"
+	$ERL    $HOME_P  -s $APP  -kernel error_logger false  -config sys  -boot start_sasl  -$TYPE debug_$NODE@$HOST
+
+
+}
+restart(){
+    stop
+    start
+
+
+}
+shell()
+{
+	$ERL \
+	-$TYPE shell$NODE@$HOST \
+	$HOME_P \
+	-boot start_sasl 
+	
+}
+ctl()
+{
+	echo "run command ussd server"
+	$ERL \
+	-$TYPE ctl_${$}_$NODE@$HOST \
+	$HOME_P \
+	-noinput -detached -hidden \
+	-boot start_sasl \
+	-s $APP_CTL -extra $NODE@$HOST $@
+}
+stop()
+{
+#	ctl stop
+	echo "Application has been stopped"
+#	sleep 2
+	pkill -TERM -f "$NODE@$HOST" && echo "Process has been terminated"
+	pkill -KILL -f "$NODE@$HOST" && echo "Process has been killed"
+}
+
+info()
+{
+	shell info
+}
+
+rotate()
+{
+	ctl rotate
+}
+
+reload()
+{
+	ctl reload
+}
+
+usage(){
+	echo "$0 {start|stop|reload|info|ctl|shell|rotate|restart}"
+}
+
+[ $# -lt 1 ] && usage
+
+$@
+
