@@ -10,7 +10,7 @@ start() ->
     application:start(crypto),
     application:start(syntax_tools),    
     application:start(compiler),    
-
+    application:start(sasl),
     application:start(prolog_open_api).
 
 stop() ->
