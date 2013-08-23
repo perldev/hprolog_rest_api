@@ -28,4 +28,4 @@ init([]) ->
             {thrift_connection_pool, start_link, [ ?DEFAULT_COUNT_THRIFT ] },
             permanent, infinity, worker , [ thrift_connection_pool ]
         },
-        {ok, {{one_for_one, 5, 10}, [Restarter, AuthDemon, ThriftPool]}}.  
+        {ok, {{one_for_one, 5, 10}, [ThriftPool, Restarter, AuthDemon ]}}.  
