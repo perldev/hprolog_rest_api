@@ -9,7 +9,9 @@
 -export([start_listener/0]).
 
 start(_StartType, _StartArgs) ->
-    timer:apply_after(1000, ?MODULE, start_listener,[]), 
+    timer:apply_after(3000, ?MODULE, start_listener,[]), 
+    application:start(ranch),
+    application:start(cowboy),
     prolog_open_api_sup:start_link().  
     
 stop(_State) ->  

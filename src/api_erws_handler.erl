@@ -5,7 +5,7 @@
 -include("open_api.hrl").
 -include("deps/eprolog/include/prolog.hrl").
 
--compile(export_all).
+-export([start_new_aim/2, start_link_session/3, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
@@ -38,6 +38,9 @@ start_new_aim(Msg, NameSpace) when is_tuple(Msg) ->
     start_link_session(NewSession, Msg, NameSpace), 
     process_req(NewSession, Msg),
     jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]);
+start_new_aim({error, Description}, _NameSpace)->
+    Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
+    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
 start_new_aim(error, _NameSpace)->
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]).
 
@@ -67,13 +70,11 @@ get_result(Session, NameSpace)->
 	[{_, _Pid, wait, _ProtoType, _Time}] ->
 		result_not_ready;
 	[{_, Pid, false, _ProtoType, _Time}] ->
-                delete_req(NameSpace, Session),
-		ets:delete(?ERWS_LINK, Session),
+                delete_session(Session,NameSpace ),
 		exit(Pid, finish),
 		false;
 	[{_, Pid, unexpected_error, _ProtoType, _Time  } ]->
-                delete_req(NameSpace, Session),
-		ets:delete(?ERWS_LINK, Session),
+                delete_session(Session,NameSpace ),
 		exit(Pid, finish),
 		unexpected_error;	
 	[{_,_,SomeThing, ProtoType, _Time}] ->
@@ -97,6 +98,7 @@ generate_http_resp(result_not_ready, Req)->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(false, Req)->
     Response  = jsx:encode([{status,<<"false">>},{ description, <<"aim was not reached">>}]),
+    ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
 generate_http_resp(unexpected_error, Req)->
     Response  = jsx:encode([{status,<<"fail">>},{ description, <<"we have got unexpected error">>}]),
@@ -112,8 +114,10 @@ generate_http_resp(not_found, Req)->
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);		
 generate_http_resp(true, Req)->
     Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">>}]),
+    ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
 generate_http_resp(Json, Req)->
+    ?LOG_INFO("~p response ~p~n",[?LINE, Json ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Json, Req).
 
 api_handle_command([<<"reload">>, BinNameS], Req) ->
@@ -159,7 +163,10 @@ api_handle_command(Path, Req) ->
 api_handle([<<"auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("authReq: ~p ~n", [Req]),
     { {Ip,_}, Req1} = cowboy_req:peer(Req),
-    generate_http_resp(auth_demon:auth(Ip , NameSpace), Req1);
+    Result = auth_demon:auth(Ip , NameSpace),
+    ?LOG_INFO("ip is: ~p ~n", [{Ip, Result}]),
+
+    generate_http_resp(Result, Req1);
 api_handle([<<"stop_auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("Req: ~p ~n", [Req]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
@@ -284,14 +291,14 @@ process_prove(Back, TempAim , Goal, Res, _StartTime, TreeEts)->
             finish;
         false ->
             ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal}]),
-            _FinishTime = erlang:now(), %%TODO
+%             _FinishTime = erlang:now(), %%TODO
             store_result(Back, false),
             prolog:clean_tree(TreeEts),
             ets:delete(TreeEts),
             false;  
         {true, SomeContext, Prev} ->
             ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal}]),
-            _FinishTime = erlang:now(), %%TODO
+%             _FinishTime = erlang:now(), %%TODO
             New = prolog_matching:bound_body(Goal, SomeContext),
             store_result(Back, New),
             Prev;                  
@@ -319,10 +326,14 @@ result(R)  ->
 
 %%NOT ALLOW cyrrilic names
 proc_object([{<<"atom">>, Name }])->
-    list_to_atom( binary_to_list(Name));  
+      list_to_atom( binary_to_list(Name));  
 proc_object([ { <<"name">>, Name}])->
-    {list_to_atom(binary_to_list(Name))}.
-  
+    { list_to_atom(binary_to_list(Name))};
+proc_object(List) when is_list(List)->
+    [ process_json_params(E) || E <- List ].  
+
+process_json_params(E) when is_number(E)->
+          E;    
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
@@ -333,8 +344,8 @@ process_json_params(E) when is_binary(E)->
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
-	  {'EXIT',_}->
-	      error;
+	  {'EXIT',Description}->
+	      {error, Description};
 	  NewList ->
 	      list_to_tuple([list_to_atom(binary_to_list(Aim))|NewList])
 	end.
@@ -351,7 +362,7 @@ generate_prolog_msg(Req, Aim)->
     case Json of
 	    {'EXIT', _ } -> {error, Req2};
 	    List when is_list(List)->
-	        {process_params(Aim, List), Req2};
+	        { process_params(Aim, List), Req2};
 	    _-> {error, Req2}
     end.
 
@@ -388,17 +399,20 @@ start_aside_reload(NameSpace, _Any) ->
     
 %% Delete/ Insert Reqs
 insert_req(NameSpace, SessionId) ->
-    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
-    true = ets:insert(AtomNS, {SessionId}).
+   AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
+   case catch ets:insert(AtomNS, {SessionId}) of
+        true->
+            ?API_LOG("~p session id has inserted to queue ~p",[{?MODULE,?LINE},  SessionId ]);
+        Exp ->
+            ?API_LOG("~p some exception during inserted to queue ~p",[{?MODULE,?LINE},  Exp ])
+   end.
 
 delete_req(NameSpace, SessionId) when is_atom(NameSpace)->
     delete_req(atom_to_list(NameSpace), SessionId);
 delete_req(NameSpace, SessionId)->
     AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
-    ets:safe_fixtable(AtomNS, true),
     case catch ets:delete(AtomNS, SessionId) of
         true-> do_nothing;
         Reason ->?API_LOG("~p UNEXPECTED delete from queue ~p",[{?MODULE,?LINE}, {AtomNS, SessionId, Reason}])
-    end,
-    ets:safe_fixtable(AtomNS, false).
+    end.
 

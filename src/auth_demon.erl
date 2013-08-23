@@ -29,21 +29,25 @@ start_link() ->
 
 %%TODO name spaces
 init([]) ->
-	Auth = ets:new(auth_info, [named_table ,public ,set]),
 	ets:new(system_state, [named_table, public]),
 	ets:insert(system_state, {prolog_api, on}),  
-	{NameSpace, Registered } = load_tables(),
+	
+	{NameSpace, Registered } = load_tables(),	
 	ListNS = fact_hbase:get_list_namespaces(),
+        ?LOG_DEBUG("namespaces ~p ~n",[ListNS]),
 	ListNSA =
             [begin 
                 Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
                 AtomName = list_to_atom(?QUEUE_PREFIX++X),
-                ets:new(AtomName, Opts),AtomName 
+                ets:new(AtomName, Opts),
+                AtomName      
+
             end|| X <- ListNS],
+        
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
-       
-        timer:apply_after(1000, ?MODULE, load_auth_info, []),
+        timer:apply_after(2000, ?MODULE, load_auth_info, []),
+        Auth = ets:new(auth_info, [named_table ,public ,set]),
         {ok, #monitor {
                         registered_namespaces = NameSpace,
                         registered_ip = Registered,
@@ -278,10 +282,15 @@ clean_not_actual(Key, AtomNS) ->
 check_expired_key('$end_of_table', _Fun,  _Table )->
     finish;
 check_expired_key(Key, Fun, Table)->
-    [ Value ] = ets:lookup(Table, Key),
-    NewKey = Fun(Value, Table, Key),
-    check_expired_key(NewKey, Fun, Table).
-
+   case  catch ets:lookup(Table, Key) of
+        [ Value ] ->
+            NewKey = Fun(Value, Table, Key),
+            check_expired_key(NewKey, Fun, Table);
+        []->
+            NewKey = ets:first(?ERWS_LINK),
+            check_expired_key(NewKey, Fun, Table)
+    end
+.
     
 cache_connections() ->
     gen_server:cast(?MODULE,cache_connections).
