@@ -163,24 +163,24 @@ api_handle_command(Path, Req) ->
 api_handle([<<"auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("authReq: ~p ~n", [Req]),
     { {Ip,_}, Req1} = cowboy_req:peer(Req),
-    Result = auth_demon:auth(Ip , NameSpace),
+    Result = api_auth_demon:auth(Ip , NameSpace),
     ?LOG_INFO("ip is: ~p ~n", [{Ip, Result}]),
 
     generate_http_resp(Result, Req1);
 api_handle([<<"stop_auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("Req: ~p ~n", [Req]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    generate_http_resp(auth_demon:deauth(Ip, NameSpace), Req1);
+    generate_http_resp(api_auth_demon:deauth(Ip, NameSpace), Req1);
 api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
     ?LOG_INFO("Reload namespace: ~p~n", [NameSpace]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case auth_demon:check_auth(Ip, NameSpace) of
+    case api_auth_demon:check_auth(Ip, NameSpace) of
 	    false -> 
             generate_http_resp(permissions_denied, Req1);
         true -> 
-            auth_demon:change_status(Ip, NameSpace, {status, off}),  
+            api_auth_demon:change_status(Ip, NameSpace, {status, off}),  
             Result = api_handle_command(Path, Req),
-            auth_demon:change_status(Ip, NameSpace, {status, on}),
+            api_auth_demon:change_status(Ip, NameSpace, {status, on}),
             Result;
         try_again ->
             generate_http_resp(try_again, Req1);
@@ -190,7 +190,7 @@ api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
 api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, NameSpace, Cmd, State]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case auth_demon:check_auth(Ip, NameSpace) of
+    case api_auth_demon:check_auth(Ip, NameSpace) of
 	    false -> 
                 generate_http_resp(permissions_denied, Req1);
 	    true  -> 
