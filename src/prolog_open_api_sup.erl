@@ -3,7 +3,7 @@
 -export([start_link/0]).  
 -export([init/1]).  
 -include("open_api.hrl").
--include("deps/eprolog/include/prolog.hrl").
+-include_lib("eprolog/include/prolog.hrl").
 
 
 start_link() ->  
@@ -15,8 +15,9 @@ init([]) ->
                         ?WEB_REQS(Format, Params)
                       end,
 	Restarter = {"monitor",
-        {converter_monitor, start_link, [ LogFunction ]},
-        permanent, infinity, worker , [ converter_monitor]
+        {
+            converter_monitor, start_link, [ LogFunction ]},
+            permanent, infinity, worker , [ converter_monitor]
         },
         AuthDemon = {
         "api_auth_demon",
