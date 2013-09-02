@@ -13,7 +13,7 @@
             cache_connections/0,
             change_status/3,
             load_auth_info/1,
-            check_expired_sessions/1,
+            check_expired_sessions/2,
             regis_public_system/3,
             save_public_system/3,
             get_real_namespace_name/1]).
@@ -50,7 +50,7 @@ init([Application]) ->
 
             end|| X <- ListNS],
         
-        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA]),
+        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA, Application]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
         public_systems(),
@@ -288,25 +288,29 @@ check_system_state() ->
 change_status(Ip, NameSpace, Status) ->
     gen_server:cast(?MODULE, {change_status, Ip, NameSpace, Status}).
     
-check_expired_sessions( NameSpaces )->
-     {ok, ExpiredMiliSeconds} =  application:get_env(prolog_open_api, live_time_session),
-     Now = now(),
-     Fun  = fun(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key)->   
-                            Diff = timer:now_diff(Now, StartTime),
-                            case  Diff> ExpiredMiliSeconds of
-                                true-> 
-                                   ?LOG_DEBUG("~p finish ~p expired aim  ~n", [{?MODULE,?LINE}, Body ]),
-                                    ets:delete(?ERWS_LINK, Session),
-                                    exit(Pid, expired_session),
-                                    ets:first(Table);
-                                false->   
-                                    ets:next(Table, Key)
-                            end
-              end,
-   
-    NewKey = ets:first(?ERWS_LINK),
-    check_expired_key(NewKey, Fun, ?ERWS_LINK),
-    lists:foreach(fun clean_not_actual/1, NameSpaces)
+check_expired_sessions( NameSpaces, Application )->
+    case  application:get_env(Application, live_time_session) of
+      {ok, ExpiredMiliSeconds} ->
+            Now = now(),
+            Fun  = fun(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key)->   
+                                    Diff = timer:now_diff(Now, StartTime),
+                                    case  Diff> ExpiredMiliSeconds of
+                                        true-> 
+                                        ?LOG_DEBUG("~p finish ~p expired aim  ~n", [{?MODULE,?LINE}, Body ]),
+                                            ets:delete(?ERWS_LINK, Session),
+                                            exit(Pid, expired_session),
+                                            ets:first(Table);
+                                        false->   
+                                            ets:next(Table, Key)
+                                    end
+                    end,
+        
+            NewKey = ets:first(?ERWS_LINK),
+            check_expired_key(NewKey, Fun, ?ERWS_LINK),
+            lists:foreach(fun clean_not_actual/1, NameSpaces);
+       _->
+        do_nothing
+    end
 .
 
 
