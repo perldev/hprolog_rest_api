@@ -26,7 +26,7 @@
 		  proc_table		  
     }).
 -include("open_api.hrl").
--include("deps/eprolog/include/prolog.hrl").
+-include_lib("eprolog/include/prolog.hrl").
 
 start_link() ->
 	  gen_server:start_link({local, ?MODULE},?MODULE, [],[]).

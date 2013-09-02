@@ -3,7 +3,7 @@
 -import(lists, [foldl/3,foreach/2]).
 
 -include("open_api.hrl").
--include("deps/eprolog/include/prolog.hrl").
+-include_lib("eprolog/include/prolog.hrl").
 
 -export([start_new_aim/2, start_link_session/3, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
 
