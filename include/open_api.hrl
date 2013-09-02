@@ -22,6 +22,9 @@
 -define(WORK_PORT,8313).
 -define(COUNT_LISTENERS,10).
 
+-define(ETS_PUBLIC_SYSTEMS, public_ids).
+-define(ETS_PUBLIC_SYSTEMS_DETS, "public_ids.dets").
+
 -define(REGISTERED_FILE, "registered.ets" ).
 -define(REGISTERED_NAMESPACE, "namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
