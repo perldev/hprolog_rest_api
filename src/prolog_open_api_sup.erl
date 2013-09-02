@@ -21,7 +21,7 @@ init([]) ->
         },
         AuthDemon = {
         "api_auth_demon",
-            {api_auth_demon, start_link, [] },
+            {api_auth_demon, start_link, [prolog_open_api] },
             permanent, infinity, worker , [ auth_demon]
         
         },

@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([start_link/0, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1 ]).
+-export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1 ]).
 -export([   auth/2, 
             deauth/2, 
             low_auth/3, 
@@ -12,7 +12,7 @@
             add_auth/2,
             cache_connections/0,
             change_status/3,
-            load_auth_info/0,
+            load_auth_info/1,
             check_expired_sessions/1,
             regis_public_system/3,
             save_public_system/3,
@@ -29,10 +29,12 @@
 -include_lib("eprolog/include/prolog.hrl").
 
 start_link() ->
-	  gen_server:start_link({local, ?MODULE},?MODULE, [],[]).
+           gen_server:start_link({local, ?MODULE},?MODULE, [prolog_open_api],[]).
+start_link(Application) ->
+	  gen_server:start_link({local, ?MODULE},?MODULE, [Application],[]).
 
 %%TODO name spaces
-init([]) ->
+init([Application]) ->
 	ets:new(system_state, [named_table, public]),
 	ets:insert(system_state, {prolog_api, on}),  
 	
@@ -50,7 +52,7 @@ init([]) ->
         
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
-        timer:apply_after(2000, ?MODULE, load_auth_info, []),
+        timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
         public_systems(),
         Auth = ets:new(api_auth_info, [named_table ,public ,set]),
         {ok, #monitor {
@@ -60,10 +62,13 @@ init([]) ->
                         proc_table = ets:new( proc_table, [named_table ,public ,set] 
         )}}.
 
-        
-load_auth_info()->
-        {ok, AuthList} = application:get_env(prolog_open_api, auth_list),
-        ets:insert(api_auth_info, AuthList)
+load_auth_info(Application)->
+        case application:get_env(Application, auth_list) of
+               {ok, AuthList} ->
+                    ets:insert(api_auth_info, AuthList);
+               _ ->
+                    ets:insert(api_auth_info, [])
+        end
 .
 
 
@@ -327,6 +332,7 @@ clean_not_actual(Key, AtomNS) ->
 check_expired_key('$end_of_table', _Fun,  _Table )->
     finish;
 check_expired_key(Key, Fun, Table)->
+    
    case  catch ets:lookup(Table, Key) of
         [ Value ] ->
             NewKey = Fun(Value, Table, Key),
