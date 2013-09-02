@@ -169,7 +169,7 @@ start_namespace(State, NameSpace, Ip)->
 	case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
                 prolog_shell:api_start(NameSpace),
-		        ets:insert(EtsNameSpace,  {NameSpace, now()}),
+		ets:insert(EtsNameSpace,  {NameSpace, now()}),
 		true;
 	    _-> true
 	end.
@@ -190,12 +190,17 @@ handle_cast({save_public_system, Id, LForeign, EtsTable}, State)->
             ?LOG_DEBUG("saving expert system result ~p ~n", [ {Id, LForeign,  ResSyncin } ])
     end, 
    {noreply, State}
-;   
+;
+%%TODO move there all compilation
 handle_cast({regis_public_system, Id, Foreign, Source = {file, _} }, State)->
     Config = dict:new(),
     NewConfig = dict:store( source, Source, Config  ),
     NewConfig1 = dict:store( ips, [ { '*', yes }  ], NewConfig  ),
     ets:insert(State#monitor.auth_info, { {'*', Foreign }, yes  } ),
+    %%save flag of loading the system
+    EtsNameSpace = State#monitor.registered_namespaces,
+    ets:insert(EtsNameSpace,  {Foreign, now()}),
+    
     ets:insert(?ETS_PUBLIC_SYSTEMS, { Id, Foreign, NewConfig1 } ),   
     {noreply, State}
 ;   
