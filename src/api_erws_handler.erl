@@ -120,21 +120,22 @@ generate_http_resp(Json, Req)->
     ?LOG_INFO("~p response ~p~n",[?LINE, Json ]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Json, Req).
 
-api_handle_command([<<"reload">>, BinNameS], Req) ->
-    ?LOG_INFO("Reload: ~p~n", [Req]),
-    NameSpace = binary_to_list(BinNameS),
-    Res = case fact_hbase:check_exist_table(NameSpace ++ ?META_FACTS) of
-        false ->
-            io:format("res check exist_table: ~p~n", [false]), 
-            <<"fail">>;
-        true ->
-            io:format("res check exist_table: ~p~n", [true]),
-            reload(NameSpace);
-        _ -> 
-            <<"fail">>
-    end,
-    Resp = jsx:encode([{status,Res}, {description, <<"reload namespace">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
+% api_handle_command([<<"reload">>, BinNameS], Req) ->
+%     ?LOG_INFO("Reload: ~p~n", [Req]),
+%     NameSpace = binary_to_list(BinNameS),
+%     Res = case fact_hbase:check_exist_table(NameSpace ++ ?META_FACTS) of
+%         false ->
+%             io:format("res check exist_table: ~p~n", [false]), 
+%             <<"fail">>;
+%         true ->
+%             io:format("res check exist_table: ~p~n", [true]),
+%             reload(NameSpace);
+%         _ -> 
+%             <<"fail">>
+%     end,
+%     Resp = jsx:encode([{status,Res}, {description, <<"reload namespace">>}]),
+%     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
+
 api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {Msg, Req3} = generate_prolog_msg(Req, Aim),
@@ -160,46 +161,63 @@ api_handle_command([<<"next">>, NameSpace, Session], Req) ->
 api_handle_command(Path, Req) ->
     ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
      generate_http_resp(not_found, Req).
-api_handle([<<"auth">>, NameSpace], Req, _) ->
+     
+api_handle_command2([<<"auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("authReq: ~p ~n", [Req]),
     { {Ip,_}, Req1} = cowboy_req:peer(Req),
     Result = api_auth_demon:auth(Ip , NameSpace),
     ?LOG_INFO("ip is: ~p ~n", [{Ip, Result}]),
-
     generate_http_resp(Result, Req1);
-api_handle([<<"stop_auth">>, NameSpace], Req, _) ->
+api_handle_command2([<<"stop_auth">>, NameSpace], Req, _) ->
     ?LOG_INFO("Req: ~p ~n", [Req]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    generate_http_resp(api_auth_demon:deauth(Ip, NameSpace), Req1);
-api_handle(Path = [<<"reload">>, NameSpace], Req, _ ) ->
-    ?LOG_INFO("Reload namespace: ~p~n", [NameSpace]),
-    {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case api_auth_demon:check_auth(Ip, NameSpace) of
-	    false -> 
-            generate_http_resp(permissions_denied, Req1);
-        true -> 
-            api_auth_demon:change_status(Ip, NameSpace, {status, off}),  
-            Result = api_handle_command(Path, Req),
-            api_auth_demon:change_status(Ip, NameSpace, {status, on}),
-            Result;
-        try_again ->
-            generate_http_resp(try_again, Req1);
-	system_off ->
-	    generate_http_resp(system_off, Req1)
+    generate_http_resp(api_auth_demon:deauth(Ip, NameSpace), Req1).
+    
+% api_handle_command2(Path = [<<"reload">>, NameSpace], Req, _ ) ->
+%     ?LOG_INFO("Reload namespace: ~p~n", [NameSpace]),
+%     {{Ip,_}, Req1} = cowboy_req:peer(Req),
+%     case api_auth_demon:check_auth(Ip, NameSpace) of
+% 	    false -> 
+%             generate_http_resp(permissions_denied, Req1);
+%         true -> 
+%             api_auth_demon:change_status(Ip, NameSpace, {status, off}),  
+%             Result = api_handle_command(Path, Req),
+%             api_auth_demon:change_status(Ip, NameSpace, {status, on}),
+%             Result;
+%         try_again ->
+%             generate_http_resp(try_again, Req1);
+% 	system_off ->
+% 	    generate_http_resp(system_off, Req1)
+%     end.
+    
+api_handle([Cmd, ID], Req, State) ->   
+    ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
+     case catch api_auth_demon:get_real_namespace_name(ID) of
+        {'EXIT', _}->
+                generate_http_resp(not_found, Req);
+        NameSpace ->
+                api_handle_command2([Cmd, NameSpace], Req, State)
+                
     end;
-api_handle(Path = [Cmd, NameSpace, _Something], Req, State) ->
-    ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, NameSpace, Cmd, State]),
+api_handle([Cmd, ID, SomeThing], Req, State) ->
+    ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case api_auth_demon:check_auth(Ip, NameSpace) of
-	    false -> 
-                generate_http_resp(permissions_denied, Req1);
-	    true  -> 
-                api_handle_command(Path, Req1);
-        try_again ->                    
-                generate_http_resp(try_again, Req1);
-	system_off ->
-                generate_http_resp(system_off, Req1)
-    end;
+    case catch api_auth_demon:get_real_namespace_name(ID) of
+        {'EXIT', _}->
+                generate_http_resp(not_found, Req1);
+        NameSpace ->
+                case api_auth_demon:check_auth(Ip, NameSpace) of
+                        false -> 
+                            generate_http_resp(permissions_denied, Req1);
+                        true  -> 
+                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1);
+                    try_again ->                    
+                            generate_http_resp(try_again, Req1);
+                    system_off ->
+                            generate_http_resp(system_off, Req1)
+                end
+    end
+;
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
      generate_http_resp(not_found, Req).
