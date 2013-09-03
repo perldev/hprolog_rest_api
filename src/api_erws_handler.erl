@@ -140,23 +140,23 @@ api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {Msg, Req3} = generate_prolog_msg(Req, Aim),
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response = start_new_aim(Msg, binary_to_list(NameSpace)),
+    Response = start_new_aim(Msg, NameSpace),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req3);
 api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-    Result  = get_result( binary_to_list(Session), binary_to_list(NameSpace)),
+    Result  = get_result( binary_to_list(Session), NameSpace),
     generate_http_resp(Result, Req);
 api_handle_command([<<"finish">>, NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-     generate_http_resp(delete_session(binary_to_list(Session), list_to_atom(binary_to_list(NameSpace))), Req);
+     generate_http_resp(delete_session(binary_to_list(Session), list_to_atom(NameSpace)), Req);
 api_handle_command([<<"next">>, NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-    Result = aim_next(binary_to_list(Session), list_to_atom(binary_to_list(NameSpace))),
+    Result = aim_next(binary_to_list(Session), list_to_atom(NameSpace)),
     generate_http_resp(Result, Req);
 api_handle_command(Path, Req) ->
     ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
@@ -192,7 +192,7 @@ api_handle_command2([<<"stop_auth">>, NameSpace], Req, _) ->
     
 api_handle([Cmd, ID], Req, State) ->   
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
-     case catch api_auth_demon:get_real_namespace_name(ID) of
+     case catch api_auth_demon:get_real_namespace_name(binary_to_list(ID)) of
         {'EXIT', _}->
                 generate_http_resp(not_found, Req);
         NameSpace ->
@@ -202,7 +202,7 @@ api_handle([Cmd, ID], Req, State) ->
 api_handle([Cmd, ID, SomeThing], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case catch api_auth_demon:get_real_namespace_name(ID) of
+    case catch api_auth_demon:get_real_namespace_name(binary_to_list(ID)) of
         {'EXIT', _}->
                 generate_http_resp(not_found, Req1);
         NameSpace ->

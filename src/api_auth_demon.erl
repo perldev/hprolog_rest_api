@@ -10,16 +10,20 @@
             low_stop_auth/3,
             check_auth/2, 
             add_auth/2,
+            start_queue/1,
+            stop_queue/1,
             cache_connections/0,
             change_status/3,
+            fill_config4public/0,
             load_auth_info/1,
-            check_expired_sessions/2,
+            check_expired_sessions/1,
             regis_public_system/3,
             save_public_system/3,
             get_real_namespace_name/1]).
 
 
 -record(monitor,{
+                  application,
 		  registered_namespaces,
 		  registered_ip,
 		  auth_info,
@@ -39,23 +43,26 @@ init([Application]) ->
 	ets:insert(system_state, {prolog_api, on}),  
 	
 	{NameSpace, Registered } = load_tables(),	
-	ListNS = fact_hbase:get_list_namespaces(),
-        ?LOG_DEBUG("namespaces ~p ~n",[ListNS]),
-	ListNSA =
-            [begin 
-                Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
-                AtomName = list_to_atom(?QUEUE_PREFIX++X),
-                ets:new(AtomName, Opts),
-                AtomName      
-
-            end|| X <- ListNS],
+% 	ListNS = fact_hbase:get_list_namespaces(),
+%         ?LOG_DEBUG("namespaces ~p ~n",[ListNS]),
+% 	ListNSA =
+%             [begin 
+%                 Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
+%                 AtomName = list_to_atom(?QUEUE_PREFIX++X),
+%                 ets:new(AtomName, Opts),
+%                 AtomName      
+% 
+%             end|| X <- ListNS],
         
-        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ListNSA, Application]),
+        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ Application]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
         public_systems(),
+        
         Auth = ets:new(api_auth_info, [named_table ,public ,set]),
+        
         {ok, #monitor {
+                        application = Application,
                         registered_namespaces = NameSpace,
                         registered_ip = Registered,
                         auth_info = Auth,
@@ -65,11 +72,34 @@ init([Application]) ->
 load_auth_info(Application)->
         case application:get_env(Application, auth_list) of
                {ok, AuthList} ->
-                    ets:insert(api_auth_info, AuthList);
+                    ets:insert(api_auth_info, AuthList),
+                    ?MODULE:fill_config4public()
+                    ;
                _ ->
                     ets:insert(api_auth_info, [])
         end
 .
+fill_config4public()->
+       NameSpaces =  ets:foldl(fun({PublicKey,InnerKey, Config}, Acum)-> 
+                                    case dict:find(ips, Config) of
+                                        {ok, List}->
+                                            PermList = lists:map(fun({Ip, Perm})->
+                                                                        { {Ip, InnerKey}, Perm}
+                                                                end, List),
+                                            ets:insert(api_auth_info, PermList),
+                                            [InnerKey|Acum];
+                                        _ ->
+                                            ?LOG_DEBUG("Namespace ~p is blocked ~n",[InnerKey]),
+                                            Acum
+                                    end
+                    
+                  end,
+                  [],
+                  ?ETS_PUBLIC_SYSTEMS
+        ),
+        ?LOG_DEBUG("Namespaces ~p are being published  ~n",[NameSpaces])
+.
+
 
 
 public_systems()->
@@ -153,7 +183,7 @@ low_auth(State, Ip, NameSpace)->
 get_real_namespace_name(Id) ->
        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
             [{Id, Name, _Config}]->
-                Name;
+                Id;
             []->
                 throw({'EXIT', public_system_not_existed})
        end.
@@ -165,11 +195,18 @@ save_public_system( Id, LForeign, EtsTable)->
 regis_public_system(Id, LForeign, Source)->
      gen_server:cast(?MODULE, {regis_public_system ,Id, LForeign, Source }).
 
+stop_queue(NameSpace)->
+    gen_server:cast(?MODULE, {stop_queue, NameSpace}).
+    
+start_queue(NameSpace)->
+    gen_server:cast(?MODULE, {start_queue, NameSpace}).
 
 start_namespace(State, NameSpace, Ip)->
     EtsRegis = State#monitor.registered_ip,
     EtsNameSpace = State#monitor.registered_namespaces,
     ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
+    api_auth_demon:start_queue(NameSpace),
+    
     ets:new(list_to_atom(NameSpace), [named_table, public, {write_concurrency,true}, {read_concurrency,true}]), %%For statistic
 	case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
@@ -191,7 +228,7 @@ handle_cast({save_public_system, Id, LForeign, EtsTable}, State)->
         []->    
             ?LOG_DEBUG("uexpected error for saving ~p ~n", [{Id, LForeign}]);
         [{Id, LForeign, Config} ]->
-            ResSyncin = (catch   sync_public_system(EtsTable, LForeign, Config) ),
+            ResSyncin = (catch   sync_public_system(EtsTable, LForeign,Id,  Config) ),
             ?LOG_DEBUG("saving expert system result ~p ~n", [ {Id, LForeign,  ResSyncin } ])
     end, 
    {noreply, State}
@@ -209,6 +246,33 @@ handle_cast({regis_public_system, Id, Foreign, Source = {file, _} }, State)->
     ets:insert(?ETS_PUBLIC_SYSTEMS, { Id, Foreign, NewConfig1 } ),   
     {noreply, State}
 ;   
+handle_cast({start_queue, X}, State)->
+    
+    Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
+    AtomName = list_to_atom(?QUEUE_PREFIX++X),
+    ets:new(AtomName, Opts), %%queue 
+    case application:get_env(State#monitor.application, queue) of
+        undefined ->
+            application:set_env(State#monitor.application, queue, [AtomName]);
+        List ->
+            application:set_env(State#monitor.application, queue, [AtomName|List])
+    end,
+    {noreply, State}
+;
+handle_cast({stop_queue, X}, State)->
+    
+    AtomName = list_to_atom(?QUEUE_PREFIX++X),
+    ets:delete(AtomName), %%queue 
+    case application:get_env(State#monitor.application, queue) of
+        undefined ->
+            application:set_env(State#monitor.application, queue, []);
+        List ->
+            NewList = lists:delete(AtomName, List),
+            application:set_env(State#monitor.application, queue, NewList)
+    end,
+
+    {noreply, State}
+;
 handle_cast({change_status, Ip, NameSpace, Status}, State) ->
     ?LOG_DEBUG("change status ip: ~p; namespace: ~p; status: ~p~n", [Ip, NameSpace, Status]),
     EtsRegis = State#monitor.registered_ip,
@@ -223,7 +287,8 @@ handle_cast(cache_connections, S)->
     {noreply, S};
 handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
 	  %TODO reloading various namespaces
-	  low_stop_auth(MyState,Ip, NameSpace ),
+	 api_auth_demon:stop_queue(NameSpace), 
+	 low_stop_auth(MyState,Ip, NameSpace ),
          {noreply, MyState};
          
 %% Ip ={0,0,0,0}|*
@@ -288,7 +353,14 @@ check_system_state() ->
 change_status(Ip, NameSpace, Status) ->
     gen_server:cast(?MODULE, {change_status, Ip, NameSpace, Status}).
     
-check_expired_sessions( NameSpaces, Application )->
+check_expired_sessions( Application )->
+
+    NameSpaces = 
+        case application:get_env(Application, queue) of
+                {ok, List}-> List;
+                _ ->[]
+        end,
+    
     case  application:get_env(Application, live_time_session) of
       {ok, ExpiredMiliSeconds} ->
             Now = now(),
@@ -347,12 +419,12 @@ check_expired_key(Key, Fun, Table)->
     end
 .
 
-sync_public_system(EtsTable, LForeign, Config)->
+sync_public_system(EtsTable, LForeign, Id,  Config)->
     case dict:find(source, Config) of
         {ok, {file, Path} }->
             ets:tab2file(EtsTable, Path);
         {ok, hbase}->
-            prolog:memory2hbase( LForeign, LForeign);
+            prolog:memory2hbase( Id, Id);
         _ ->
             throw({'non_exist_the_source', LForeign, Config})
    end,         
