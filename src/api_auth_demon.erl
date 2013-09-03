@@ -70,7 +70,7 @@ init([Application]) ->
         )}}.
 
 load_auth_info(Application)->
-        get_server:cast(?MODULE, {load_auth_info, Application }).
+        gen_server:cast(?MODULE, {load_auth_info, Application }).
 
  
 fill_config4public()->
