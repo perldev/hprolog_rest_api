@@ -77,7 +77,32 @@ load_auth_info(Application)->
                     ;
                _ ->
                     ets:insert(api_auth_info, [])
-        end
+        end,
+        ets:foldl(fun({NameSpaceName, _Time}, In) ->  
+                                            ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
+                                            case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
+                                                 [{_, _, Config  } ]->
+                                                             case dict:find(source, Config) of
+                                                                    {ok, {file, Path} }->
+                                                                         ?LOG_DEBUG("load namespace from file ~p ~n",[Path]),
+                                                                        start_queue(NameSpaceName), 
+                                                                        ets:file2tab(Path);
+                                                                    {ok, hbase}->
+                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
+                                                                         start_queue(NameSpaceName), 
+                                                                         prolog_shell:api_start(NameSpaceName);
+                                                                    _ ->
+                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
+                                                            end,   
+                                                            ets:insert(registered_namespaces, {NameSpaceName, now()}),
+                                                            [NameSpaceName|In];
+                                                 _->
+                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
+                                                   In                                                 
+                                             end
+                                            
+                                        end,[], registered_namespaces)
+        
 .
 fill_config4public()->
        NameSpaces =  ets:foldl(fun({PublicKey,_InnerKey, Config}, Acum)-> 
@@ -108,7 +133,7 @@ public_systems()->
                  Res;
             _->
                 ets:new(?ETS_PUBLIC_SYSTEMS,[set, public, named_table])
-         end   
+         end
 .
 
 
@@ -123,28 +148,6 @@ load_tables()->
                        end,
 	 NameSpace  =  case catch ets:file2tab(?REGISTERED_NAMESPACE  ) of
 			        {ok, Tab2} ->
-			            ets:foldl(fun({NameSpaceName, _Time}, In) ->  
-					    ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
-					    case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
-                                                 [{_, _, Config  } ]->
-                                                 	     case dict:find(source, Config) of
-                                                                    {ok, {file, Path} }->
-                                                                         ?LOG_DEBUG("load namespace from file ~p ~n",[Path]),
-                                                                        ets:file2tab(Path);
-                                                                    {ok, hbase}->
-                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
-                                                                         prolog_shell:api_start(NameSpaceName);
-                                                                    _ ->
-                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
-                                                            end,   
-                                                 	    ets:insert(Tab2, {NameSpaceName, now()}),
-                                                 	    [NameSpaceName|In];
-                                                 _->
-                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
-                                                   In                                                 
-                                             end
-					    
-				        end,[], Tab2),
 			            Tab2;	
 			        _ -> 
 			            ets:new(registered_namespaces , [named_table ,public ,set])
