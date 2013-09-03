@@ -226,9 +226,9 @@ handle_cast({load_auth_info, Application }, State)->
                                                  [{_, _, Config  } ]->
                                                              case dict:find(source, Config) of
                                                                     {ok, {file, Path} }->
+                                                                         ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
                                                                          ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path,  ets:file2tab(Path)]),
-                                                                        start_queue(NameSpaceName);
-                                                                       
+                                                                         start_queue(NameSpaceName);
                                                                     {ok, hbase}->
                                                                         ?LOG_DEBUG("load namespace from hbase  ~n",[]),
                                                                          start_queue(NameSpaceName), 
