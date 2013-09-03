@@ -227,6 +227,7 @@ handle_cast({load_auth_info, Application }, State)->
                                                              case dict:find(source, Config) of
                                                                     {ok, {file, Path} }->
                                                                          ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
+                                                                         ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ),
                                                                          ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path,  ets:file2tab(Path)]),
                                                                          start_queue(NameSpaceName);
                                                                     {ok, hbase}->
