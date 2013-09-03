@@ -238,11 +238,10 @@ handle_cast({regis_public_system, Id, Foreign, Source = {file, _} }, State)->
     Config = dict:new(),
     NewConfig = dict:store( source, Source, Config  ),
     NewConfig1 = dict:store( ips, [ { '*', yes }  ], NewConfig  ),
-    ets:insert(State#monitor.auth_info, { {'*', Foreign }, yes  } ),
+    ets:insert(State#monitor.auth_info, { {'*', Id }, yes  } ),
     %%save flag of loading the system
     EtsNameSpace = State#monitor.registered_namespaces,
-    ets:insert(EtsNameSpace,  {Foreign, now()}),
-    
+    ets:insert(EtsNameSpace,  {Id, now()}),
     ets:insert(?ETS_PUBLIC_SYSTEMS, { Id, Foreign, NewConfig1 } ),   
     {noreply, State}
 ;   
