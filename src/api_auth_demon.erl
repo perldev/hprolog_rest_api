@@ -84,9 +84,9 @@ load_auth_info(Application)->
                                                  [{_, _, Config  } ]->
                                                              case dict:find(source, Config) of
                                                                     {ok, {file, Path} }->
-                                                                         ?LOG_DEBUG("load namespace from file ~p ~n",[Path]),
-                                                                        start_queue(NameSpaceName), 
-                                                                        ets:file2tab(Path);
+                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path,  ets:file2tab(Path)]),
+                                                                        start_queue(NameSpaceName);
+                                                                       
                                                                     {ok, hbase}->
                                                                         ?LOG_DEBUG("load namespace from hbase  ~n",[]),
                                                                          start_queue(NameSpaceName), 
