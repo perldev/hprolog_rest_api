@@ -276,7 +276,7 @@ handle_cast({start_queue, X}, State)->
     case application:get_env(State#monitor.application, queue) of
         undefined ->
             application:set_env(State#monitor.application, queue, [AtomName]);
-        List ->
+        {ok,List} ->
             application:set_env(State#monitor.application, queue, [AtomName|List])
     end,
     {noreply, State}
@@ -288,7 +288,7 @@ handle_cast({stop_queue, X}, State)->
     case application:get_env(State#monitor.application, queue) of
         undefined ->
             application:set_env(State#monitor.application, queue, []);
-        List ->
+        {ok,List} ->
             NewList = lists:delete(AtomName, List),
             application:set_env(State#monitor.application, queue, NewList)
     end,
