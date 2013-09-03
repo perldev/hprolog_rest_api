@@ -41,7 +41,7 @@ start_link(Application) ->
 init([Application]) ->
 	ets:new(system_state, [named_table, public]),
 	ets:insert(system_state, {prolog_api, on}),  
-	
+	public_systems(),
 	{NameSpace, Registered } = load_tables(),	
 % 	ListNS = fact_hbase:get_list_namespaces(),
 %         ?LOG_DEBUG("namespaces ~p ~n",[ListNS]),
@@ -57,7 +57,7 @@ init([Application]) ->
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ Application]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
-        public_systems(),
+        
         
         Auth = ets:new(api_auth_info, [named_table ,public ,set]),
         
@@ -125,9 +125,25 @@ load_tables()->
 			        {ok, Tab2} ->
 			            ets:foldl(fun({NameSpaceName, _Time}, In) ->  
 					    ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
-					    prolog_shell:api_start(NameSpaceName),
-					    ets:insert(Tab2, {NameSpaceName, now()}),
-					    [NameSpaceName|In]
+					    case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
+                                                 [{_, _, Config  } ]->
+                                                 	     case dict:find(source, Config) of
+                                                                    {ok, {file, Path} }->
+                                                                         ?LOG_DEBUG("load namespace from file ~p ~n",[Path]),
+                                                                        ets:file2tab(Path);
+                                                                    {ok, hbase}->
+                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
+                                                                         prolog_shell:api_start(NameSpaceName);
+                                                                    _ ->
+                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
+                                                            end,   
+                                                 	    ets:insert(Tab2, {NameSpaceName, now()}),
+                                                 	    [NameSpaceName|In];
+                                                 _->
+                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
+                                                   In                                                 
+                                             end
+					    
 				        end,[], Tab2),
 			            Tab2;	
 			        _ -> 
@@ -427,7 +443,7 @@ check_expired_key(Key, Fun, Table, ExpiredMiliSeconds)->
 
     
 sync_public_system(EtsTable, LForeign, Id,  Config)->
-    case dict:find(source, Config) of
+   case dict:find(source, Config) of
         {ok, {file, Path} }->
             ets:tab2file(EtsTable, Path);
         {ok, hbase}->
