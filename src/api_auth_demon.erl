@@ -353,6 +353,7 @@ check_system_state() ->
 change_status(Ip, NameSpace, Status) ->
     gen_server:cast(?MODULE, {change_status, Ip, NameSpace, Status}).
     
+   
 check_expired_sessions( Application )->
 
     NameSpaces = 
@@ -364,7 +365,17 @@ check_expired_sessions( Application )->
     case  application:get_env(Application, live_time_session) of
       {ok, ExpiredMiliSeconds} ->
             Now = now(),
-            Fun  = fun(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key)->   
+            Fun  =  fun one_expired/4,
+            NewKey = ets:first(?ERWS_LINK),
+            check_expired_key(NewKey, Fun, ?ERWS_LINK, ExpiredMiliSeconds),
+            lists:foreach(fun clean_not_actual/1, NameSpaces);
+       _->
+        do_nothing
+    end
+.
+
+one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key, ExpiredMiliSeconds)->
+                                    Now = now(),
                                     Diff = timer:now_diff(Now, StartTime),
                                     case  Diff> ExpiredMiliSeconds of
                                         true-> 
@@ -375,14 +386,11 @@ check_expired_sessions( Application )->
                                         false->   
                                             ets:next(Table, Key)
                                     end
-                    end,
-        
-            NewKey = ets:first(?ERWS_LINK),
-            check_expired_key(NewKey, Fun, ?ERWS_LINK),
-            lists:foreach(fun clean_not_actual/1, NameSpaces);
-       _->
-        do_nothing
-    end
+
+
+;
+one_expired(Body = {Session, _Pid, _Pid2, _}, Table, Key, _ExpiredMiliSeconds)->
+     ets:next(Table, Key)
 .
 
 
@@ -405,20 +413,21 @@ clean_not_actual(Key, AtomNS) ->
 
   
 
-check_expired_key('$end_of_table', _Fun,  _Table )->
+check_expired_key('$end_of_table', _Fun,  _Table, _E )->
     finish;
-check_expired_key(Key, Fun, Table)->
+check_expired_key(Key, Fun, Table, ExpiredMiliSeconds)->
     
    case  catch ets:lookup(Table, Key) of
         [ Value ] ->
-            NewKey = Fun(Value, Table, Key),
-            check_expired_key(NewKey, Fun, Table);
+            NewKey = Fun(Value, Table, Key, ExpiredMiliSeconds),
+            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds);
         []->
             NewKey = ets:first(?ERWS_LINK),
-            check_expired_key(NewKey, Fun, Table)
+            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds)
     end
 .
 
+    
 sync_public_system(EtsTable, LForeign, Id,  Config)->
     case dict:find(source, Config) of
         {ok, {file, Path} }->
