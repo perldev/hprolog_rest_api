@@ -70,40 +70,9 @@ init([Application]) ->
         )}}.
 
 load_auth_info(Application)->
-        case application:get_env(Application, auth_list) of
-               {ok, AuthList} ->
-                    ets:insert(api_auth_info, AuthList),
-                    ?MODULE:fill_config4public()
-                    ;
-               _ ->
-                    ets:insert(api_auth_info, [])
-        end,
-        ets:foldl(fun({NameSpaceName, _Time}, In) ->  
-                                            ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
-                                            case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
-                                                 [{_, _, Config  } ]->
-                                                             case dict:find(source, Config) of
-                                                                    {ok, {file, Path} }->
-                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path,  ets:file2tab(Path)]),
-                                                                        start_queue(NameSpaceName);
-                                                                       
-                                                                    {ok, hbase}->
-                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
-                                                                         start_queue(NameSpaceName), 
-                                                                         prolog_shell:api_start(NameSpaceName);
-                                                                    _ ->
-                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
-                                                            end,   
-                                                            ets:insert(registered_namespaces, {NameSpaceName, now()}),
-                                                            [NameSpaceName|In];
-                                                 _->
-                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
-                                                   In                                                 
-                                             end
-                                            
-                                        end,[], registered_namespaces)
-        
-.
+        get_server:cast(?MODULE, {load_auth_info, Application }).
+
+ 
 fill_config4public()->
        NameSpaces =  ets:foldl(fun({PublicKey,_InnerKey, Config}, Acum)-> 
                                     case dict:find(ips, Config) of
@@ -241,6 +210,41 @@ low_stop_auth(State,  Ip, NameSpace)->
 
 stop() ->
     gen_server:cast(?MODULE, stop).
+
+handle_cast({load_auth_info, Application }, State)->
+        case application:get_env(Application, auth_list) of
+               {ok, AuthList} ->
+                    ets:insert(api_auth_info, AuthList),
+                    ?MODULE:fill_config4public()
+                    ;
+               _ ->
+                    ets:insert(api_auth_info, [])
+        end,
+        ets:foldl(fun({NameSpaceName, _Time}, In) ->  
+                                            ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
+                                            case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
+                                                 [{_, _, Config  } ]->
+                                                             case dict:find(source, Config) of
+                                                                    {ok, {file, Path} }->
+                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path,  ets:file2tab(Path)]),
+                                                                        start_queue(NameSpaceName);
+                                                                       
+                                                                    {ok, hbase}->
+                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
+                                                                         start_queue(NameSpaceName), 
+                                                                         prolog_shell:api_start(NameSpaceName);
+                                                                    _ ->
+                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
+                                                            end,   
+                                                            ets:insert(State#monitor.registered_namespaces, {NameSpaceName, now()}),
+                                                            [NameSpaceName|In];
+                                                 _->
+                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
+                                                   In                                                 
+                                             end
+                                            
+                                        end,[], State#monitor.registered_namespaces),
+{noreply, State};
 
 handle_cast({save_public_system, Id, LForeign, EtsTable}, State)->
     case ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
