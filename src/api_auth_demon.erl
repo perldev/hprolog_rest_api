@@ -80,16 +80,16 @@ load_auth_info(Application)->
         end
 .
 fill_config4public()->
-       NameSpaces =  ets:foldl(fun({PublicKey,InnerKey, Config}, Acum)-> 
+       NameSpaces =  ets:foldl(fun({PublicKey,_InnerKey, Config}, Acum)-> 
                                     case dict:find(ips, Config) of
                                         {ok, List}->
                                             PermList = lists:map(fun({Ip, Perm})->
-                                                                        { {Ip, InnerKey}, Perm}
+                                                                        { {Ip, PublicKey}, Perm}
                                                                 end, List),
                                             ets:insert(api_auth_info, PermList),
-                                            [InnerKey|Acum];
+                                            [PublicKey|Acum];
                                         _ ->
-                                            ?LOG_DEBUG("Namespace ~p is blocked ~n",[InnerKey]),
+                                            ?LOG_DEBUG("Namespace ~p is blocked ~n",[PublicKey]),
                                             Acum
                                     end
                     
@@ -182,7 +182,7 @@ low_auth(State, Ip, NameSpace)->
 
 get_real_namespace_name(Id) ->
        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
-            [{Id, Name, _Config}]->
+            [{Id, _Name, _Config}]->
                 Id;
             []->
                 throw({'EXIT', public_system_not_existed})
@@ -364,7 +364,6 @@ check_expired_sessions( Application )->
     
     case  application:get_env(Application, live_time_session) of
       {ok, ExpiredMiliSeconds} ->
-            Now = now(),
             Fun  =  fun one_expired/4,
             NewKey = ets:first(?ERWS_LINK),
             check_expired_key(NewKey, Fun, ?ERWS_LINK, ExpiredMiliSeconds),
@@ -389,7 +388,7 @@ one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key, Expi
 
 
 ;
-one_expired(Body = {Session, _Pid, _Pid2, _}, Table, Key, _ExpiredMiliSeconds)->
+one_expired({_Session, _Pid, _Pid2, _}, Table, Key, _ExpiredMiliSeconds)->
      ets:next(Table, Key)
 .
 
