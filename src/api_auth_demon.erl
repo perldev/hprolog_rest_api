@@ -19,7 +19,8 @@
             check_expired_sessions/1,
             regis_public_system/3,
             save_public_system/3,
-            get_real_namespace_name/1]).
+            get_real_namespace_name/1,
+            get_name_space_info/1]).
 
 
 -record(monitor,{
@@ -167,6 +168,14 @@ low_auth(State, Ip, NameSpace)->
              end
     end
 .
+
+get_name_space_info(Id)->
+        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
+            [Var]->
+                Var;
+            []->
+                throw({'EXIT', public_system_not_existed})
+       end.
 
 get_real_namespace_name(Id) ->
        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
