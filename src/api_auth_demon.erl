@@ -44,16 +44,7 @@ init([Application]) ->
 	ets:insert(system_state, {prolog_api, on}),  
 	public_systems(),
 	{NameSpace, Registered } = load_tables(),	
-% 	ListNS = fact_hbase:get_list_namespaces(),
-%         ?LOG_DEBUG("namespaces ~p ~n",[ListNS]),
-% 	ListNSA =
-%             [begin 
-%                 Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
-%                 AtomName = list_to_atom(?QUEUE_PREFIX++X),
-%                 ets:new(AtomName, Opts),
-%                 AtomName      
-% 
-%             end|| X <- ListNS],
+
         
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ Application]),
         timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
@@ -201,13 +192,11 @@ start_queue(NameSpace)->
 start_namespace(State, NameSpace, Ip)->
     EtsRegis = State#monitor.registered_ip,
     EtsNameSpace = State#monitor.registered_namespaces,
-    ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),
-    api_auth_demon:start_queue(NameSpace),
-    
-    ets:new(list_to_atom(NameSpace), [named_table, public, {write_concurrency,true}, {read_concurrency,true}]), %%For statistic
-	case ets:lookup(EtsNameSpace, NameSpace) of
+    ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),    
+    case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
                 prolog_shell:api_start(NameSpace),
+                api_auth_demon:start_queue(NameSpace),
 		ets:insert(EtsNameSpace,  {NameSpace, now()}),
 		true;
 	    _-> true
