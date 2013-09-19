@@ -23,10 +23,10 @@
 -define(COUNT_LISTENERS,10).
 
 -define(ETS_PUBLIC_SYSTEMS, public_ids).
--define(ETS_PUBLIC_SYSTEMS_DETS, "public_ids.dets").
+-define(ETS_PUBLIC_SYSTEMS_DETS, "../consoledb/public_ids.dets").
 
--define(REGISTERED_FILE, "registered.ets" ).
--define(REGISTERED_NAMESPACE, "namespaces.ets" ).
+-define(REGISTERED_FILE, "../consoledb/registered.ets" ).
+-define(REGISTERED_NAMESPACE, "../consoledb/namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
 
 -define(QUEUE_PREFIX,"queue").
