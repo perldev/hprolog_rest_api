@@ -5,7 +5,7 @@
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
 
--export([start_new_aim/2, start_link_session/3, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
+-export([start_new_aim/3,api_callback/4, start_link_session/4, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
@@ -26,22 +26,25 @@ handle(Req, State) ->
      {ok, NewReq, State}.
     
 
-start_link_session(Session, SourceMsg, NameSpace) ->
+start_link_session(Session, SourceMsg, NameSpace, CallBackUrl) ->
     Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
     insert_req(NameSpace, Session),
-    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now()}),       
+    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now(), CallBackUrl}),       
     ok.
-     	
-start_new_aim(Msg, NameSpace) when is_tuple(Msg) ->
+
+
+
+   
+start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
     %TODO make key from server
     NewSession = generate_session(), 
-    start_link_session(NewSession, Msg, NameSpace), 
+    start_link_session(NewSession, Msg, NameSpace, CallBackUrl), 
     process_req(NewSession, Msg),
     jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]);
-start_new_aim({error, Description}, _NameSpace)->
+start_new_aim({error, Description}, _NameSpace,_)->
     Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
-start_new_aim(error, _NameSpace)->
+start_new_aim(error, _NameSpace, _)->
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]).
 
 api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
@@ -67,17 +70,17 @@ api_var_match({ { Key }, Val}) ->
 get_result(Session, NameSpace)->
     case ets:lookup(?ERWS_LINK, Session) of 
 	[]-> session_finished;
-	[{_, _Pid, wait, _ProtoType, _Time}] ->
+	[{_, _Pid, wait, _ProtoType, _Time, _}] ->
 		result_not_ready;
-	[{_, Pid, false, _ProtoType, _Time}] ->
-                delete_session(Session,NameSpace ),
+	[{_, Pid, false, _ProtoType, _Time, _}] ->
+                delete_session(Session, NameSpace ),
 		exit(Pid, finish),
 		false;
-	[{_, Pid, unexpected_error, _ProtoType, _Time  } ]->
-                delete_session(Session,NameSpace ),
+	[{_, Pid, unexpected_error, _ProtoType, _Time, _  } ]->
+                delete_session(Session, NameSpace ),
 		exit(Pid, finish),
 		unexpected_error;	
-	[{_,_,SomeThing, ProtoType, _Time}] ->
+	[{_,_,SomeThing, ProtoType, _Time, _}] ->
                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
 	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
 	        VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
@@ -138,9 +141,11 @@ generate_http_resp(Json, Req)->
 
 api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
-    {Msg, Req3} = generate_prolog_msg(Req, Aim),
+    {Msg, Req2} = generate_prolog_msg(Req, Aim),
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response = start_new_aim(Msg, NameSpace),
+    {ok, PostVals, Req3} = cowboy_req:body_qs(Req2),
+    CallBack = proplists:get_value(<<"callback">>, PostVals),
+    Response = start_new_aim(Msg, NameSpace,CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req3);
@@ -224,14 +229,14 @@ api_handle(Path, Req, _) ->
 
 aim_next(Session, AtomNS) ->
     case ets:lookup(?ERWS_LINK, Session) of
-	    [{Session, _Pid, wait, _ProtoType,_StartTime}] ->
+	    [{Session, _Pid, wait, _ProtoType,_StartTime, _}] ->
 	        aim_in_process;
-	    [{Session, _Pid, Res, _ProtoType,_StartTime}] when is_atom(Res) ->
+	    [{Session, _Pid, Res, _ProtoType,_StartTime, _}] when is_atom(Res) ->
 	        delete_session(Session, AtomNS),
 	        Res;
-	    [{Session, Pid, Res, ProtoType, StartTime}] when is_tuple(Res) ->
+	    [{Session, Pid, Res, ProtoType, StartTime, CallBack}] when is_tuple(Res) ->
 	        Pid ! {some_code, next},
-	        ets:insert(?ERWS_LINK, {Session, Pid, wait, ProtoType, StartTime}),
+	        ets:insert(?ERWS_LINK, {Session, Pid, wait, ProtoType, StartTime, CallBack}),
 	        true;
 	    []->
 	        not_found
@@ -240,7 +245,7 @@ aim_next(Session, AtomNS) ->
 delete_session(Session, AtomNS) ->
     delete_req(AtomNS, Session),  
     case ets:lookup(?ERWS_LINK, Session) of
-	    [{Session, Pid, _Status, _ProtoType, _StartTime}] ->
+	    [{Session, Pid, _Status, _ProtoType, _StartTime, _CallBack}] ->
 	        ets:delete(?ERWS_LINK, Session),
 	        Pid ! {some_code, finish} ,
 	        true;
@@ -251,7 +256,7 @@ delete_session(Session, AtomNS) ->
  
 process_req(Session, Msg)->
       case ets:lookup(?ERWS_LINK, Session) of
-	  [ {Session, Pid,'wait',_ProtoType, _Time}] ->
+	  [ {Session, Pid,'wait',_ProtoType, _Time, _CallBack}] ->
 		 Pid ! {some_code, Session, Msg},
 		 ?API_LOG("send back: ~p ~n ~p ~n ~p ~n~n", [Session, Pid, Msg]);
 	  []->
@@ -271,12 +276,12 @@ shell_loop(start, TreeEts, Back) ->
 	    {some_code, Back, Goal}->	  
 		    ?API_LOG("~p wait new aim from user ~p",[{?MODULE,?LINE}, {self(),Goal}]),
 			{TempAim, _ShellContext} =  prolog_shell:make_temp_aim(Goal), 
-            ?LOG_DEBUG("TempAim : ~p~n", [TempAim]),
-            ?LOG_DEBUG("~p make temp aim ~p ~n",[{?MODULE,?LINE}, TempAim]),
-            StartTime = erlang:now(),
-            Res = (catch prolog:aim( finish, ?ROOT, Goal,  dict:new(), 1, TreeEts, ?ROOT)),
-            ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
-            shell_loop(ProcessResult, TreeEts, Back, Goal, TempAim)
+                    ?LOG_DEBUG("TempAim : ~p~n", [TempAim]),
+                    ?LOG_DEBUG("~p make temp aim ~p ~n",[{?MODULE,?LINE}, TempAim]),
+                    StartTime = erlang:now(),
+                    Res = (catch prolog:aim( finish, ?ROOT, Goal,  dict:new(), 1, TreeEts, ?ROOT)),
+                    ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
+                    shell_loop(ProcessResult, TreeEts, Back, Goal, TempAim)
 	end.
 shell_loop(finish, _TreeEts, _Back, _Goal, _TempAim) ->
     %%REWRITE it like trace
@@ -331,10 +336,93 @@ process_prove(Back, TempAim , Goal, Res, _StartTime, TreeEts)->
 store_result(Session ,R) ->
     case ets:lookup(?ERWS_LINK, Session) of
 	    []-> false;%TODO clean all 
-	    [{Session, Pid, _OldRes,ProtoType, Time } ]->
-		    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType ,Time}),
-		    true
+	    [{Session, Pid, _OldRes,ProtoType, Time,undefined } ]->
+		    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType ,Time, undefined}),
+		    true;
+             [{Session, Pid, _OldRes,ProtoType, Time, CallBackUrl } ]->
+                    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType, Time, CallBackUrl}),    
+                    spawn(?MODULE, api_callback,[R,Session,  ProtoType, CallBackUrl ] ),
+                    
+                    true
     end.
+
+api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->    
+                [_| Params]     = list_to_tuple(ProtoType),
+                VarsRes = lists:map( fun api_var_match/1, Params ),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),
+                Post = <<"params=",PrePost/binary>>,
+                case catch  httpc:request( post, { CallBackUrl,
+                                    [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
+                                        {"Accept","application/json"}
+                                    ]
+                                 },
+                                    [ {connect_timeout,?CACHE_CONNECTION },
+                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {sync, true},{ body_format, binary } ] ) of
+                    { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    Res ->
+                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            exit(normal)                      
+                end
+
+;
+api_callback(false, Session,  ProtoType, CallBackUrl)->
+                [_| Params]     = list_to_tuple(ProtoType),
+                VarsRes = lists:map( fun api_var_match/1, Params ),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
+                Post = <<"params=",PrePost/binary>>,
+                case catch  httpc:request( post, { CallBackUrl,
+                                    [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
+                                        {"Accept","application/json"}
+                                    ]
+                                 },
+                                    [ {connect_timeout,?CACHE_CONNECTION },
+                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {sync, true},{ body_format, binary } ] ) of
+                    { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    Res ->
+                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            exit(normal)                        
+                end
+
+
+;
+api_callback(Res, Session,  _ProtoType, CallBackUrl)->
+                [_, Params]     = list_to_tuple(Res),
+                VarsRes = lists:map( fun api_var_match/1, Params ),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
+                Post = <<"params=",PrePost/binary>>,
+                case catch  httpc:request( post, { CallBackUrl,
+                                    [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
+                                        {"Accept","application/json"}
+                                    ]
+                                 },
+                                    [ {connect_timeout,?CACHE_CONNECTION },
+                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {sync, true},{ body_format, binary } ] ) of
+                    { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
+                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            exit(normal);
+                    Res ->
+                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            exit(normal)                        
+                end
+
+
+.
 
     
 result(R) when  is_binary(R) ->
@@ -370,7 +458,7 @@ process_params(Aim, List)->
 
 generate_prolog_msg(Req, Aim)->
     {ok, Body, Req2} = cowboy_req:body(Req),
-    <<"params=",Post/binary>> = Body , 
+    <<"params=",Post/binary>> = Body, 
     %proplists:get_value(<<"params">>, PostVals,undefined),
     ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
     Json  = ( catch jsx:decode(Post) ),
@@ -399,21 +487,12 @@ reload(NameSpace) ->
             fact_hbase:load_rules2ets(NameSpace), 
             <<"true">>;
         _ ->
-            spawn(fun() -> start_aside_reload(NameSpace) end),
+%             spawn(fun() -> start_aside_reload(NameSpace) end),
             <<"set_aside">>
             
     end.   
     
-start_aside_reload(NameSpace) ->
-    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
-    start_aside_reload(NameSpace, proplists:get_value(size, ets:info(AtomNS))).
-start_aside_reload(NameSpace, 0) ->
-    prolog:delete_inner_structs(NameSpace),
-    fact_hbase:load_rules2ets(NameSpace),
-    ok;
-start_aside_reload(NameSpace, _Any) ->
-    timer:sleep(1000),
-    start_aside_reload(NameSpace).
+
     
 %% Delete/ Insert Reqs
 insert_req(NameSpace, SessionId) ->

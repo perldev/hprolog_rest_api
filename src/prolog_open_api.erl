@@ -5,12 +5,15 @@
 
 start() ->
 
-
+    crypto:start(),
+    inets:start(),
     application:start(lager),
     application:start(crypto),
     application:start(syntax_tools),    
     application:start(compiler),    
     application:start(sasl),
+    application:start(ranch),
+    application:start(cowboy),
     application:start(prolog_open_api).
 
 stop() ->
