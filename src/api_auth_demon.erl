@@ -20,7 +20,8 @@
             regis_public_system/3,
             save_public_system/3,
             get_real_namespace_name/1,
-            get_name_space_info/1]).
+            get_name_space_info/1]
+       ).
 
 
 -record(monitor,{
@@ -394,7 +395,7 @@ check_expired_sessions( Application )->
     end
 .
 
-one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key, ExpiredMiliSeconds)->
+one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime, _Call}, Table, Key, ExpiredMiliSeconds)->
                                     Now = now(),
                                     Diff = timer:now_diff(Now, StartTime),
                                     case  Diff> ExpiredMiliSeconds of
@@ -409,7 +410,7 @@ one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime}, Table, Key, Expi
 
 
 ;
-one_expired({_Session, _Pid, _Pid2, _}, Table, Key, _ExpiredMiliSeconds)->
+one_expired({_Session, _Pid, _Pid2, _,_Call}, Table, Key, _ExpiredMiliSeconds)->
      ets:next(Table, Key)
 .
 
