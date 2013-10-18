@@ -359,7 +359,7 @@ api_callback_process_params(T) when is_list(T)->
           
     
 api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->    
-                [_| Params]     = list_to_tuple(ProtoType),
+                [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
@@ -384,7 +384,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->
 
 ;
 api_callback(false, Session,  ProtoType, CallBackUrl)->
-                [_| Params]     = list_to_tuple(ProtoType),
+                [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
@@ -410,7 +410,7 @@ api_callback(false, Session,  ProtoType, CallBackUrl)->
 
 ;
 api_callback(Res, Session,  _ProtoType, CallBackUrl)->
-                [_, Params]     = list_to_tuple(Res),
+                [_| Params]     = tuple_to_list(Res),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
