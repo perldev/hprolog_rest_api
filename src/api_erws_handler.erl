@@ -347,7 +347,7 @@ store_result(Session ,R) ->
     end.
 
 api_callback_process_params({SomeThing}) when is_atom(SomeThing)->
-    atom_to_list( list_to_binary(SomeThing) )
+    [{ list_to_binary(atom_to_list( SomeThing )), false }]
 ;
 api_callback_process_params(T) when is_number(T)->
     T
