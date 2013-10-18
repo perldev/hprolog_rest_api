@@ -367,7 +367,9 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
-                                    ]
+                                    ],
+                                    "application/x-www-form-urlencoded",
+                                     Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -392,7 +394,9 @@ api_callback(false, Session,  ProtoType, CallBackUrl)->
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
-                                    ]
+                                    ],
+                                     "application/x-www-form-urlencoded",
+                                     Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -418,7 +422,9 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl)->
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
-                                    ]
+                                    ],
+                                     "application/x-www-form-urlencoded",
+                                     Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
