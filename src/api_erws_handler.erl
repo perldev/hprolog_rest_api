@@ -443,14 +443,7 @@ result(R)  ->
     list_to_binary ( lists:flatten( io_lib:format("~p",[R]) ) ).
 
 %%NOT ALLOW cyrrilic names
-proc_object([true])->
-      "true";
-proc_object([false])->
-      "false";
-proc_object([undefined])->
-      0;      
-proc_object([null])->
-      0;
+
 proc_object([{<<"atom">>, Name }])->
       list_to_atom( binary_to_list(Name));  
 proc_object([ { <<"name">>, Name}])->
@@ -458,6 +451,16 @@ proc_object([ { <<"name">>, Name}])->
 proc_object(List) when is_list(List)->
     [ process_json_params(E) || E <- List ].  
 
+    
+    
+process_json_params(true)->
+      "true";
+process_json_params(false)->
+      "false";
+process_json_params(undefined)->
+      0;      
+process_json_params(null)->
+      0;    
 process_json_params(E) when is_number(E)->
           E;    
 process_json_params(E) when is_list(E)->
