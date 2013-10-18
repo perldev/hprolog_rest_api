@@ -141,10 +141,11 @@ generate_http_resp(Json, Req)->
 
 api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
-    {Msg, Req2} = generate_prolog_msg(Req, Aim),
-    ?WEB_REQS("~n generate aim ~p",[Msg]),
-    {ok, PostVals, Req3} = cowboy_req:body_qs(Req2),
+    {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
+    Post = proplists:get_value(<<"params">>, PostVals),
+    Msg = generate_prolog_msg(Post, Aim),
+    ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, NameSpace,CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
@@ -456,9 +457,7 @@ process_params(Aim, List)->
 	      list_to_tuple([list_to_atom(binary_to_list(Aim))|NewList])
 	end.
 
-generate_prolog_msg(Req, Aim)->
-    {ok, Body, Req2} = cowboy_req:body(Req),
-    <<"params=",Post/binary>> = Body, 
+generate_prolog_msg(Post, Aim)->
     %proplists:get_value(<<"params">>, PostVals,undefined),
     ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
     Json  = ( catch jsx:decode(Post) ),
@@ -466,10 +465,10 @@ generate_prolog_msg(Req, Aim)->
 %    jsx:decode(<<"[1,{\"name\":1}]">>).
 %    [1,[{<<"name">>,1}]]
     case Json of
-	    {'EXIT', _ } -> {error, Req2};
+	    {'EXIT', _ } -> error;
 	    List when is_list(List)->
-	        { process_params(Aim, List), Req2};
-	    _-> {error, Req2}
+	        process_params(Aim, List);
+	    _-> error
     end.
 
 generate_session()->
