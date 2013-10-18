@@ -29,4 +29,6 @@ init([]) ->
             {thrift_connection_pool, start_link, [ ?DEFAULT_COUNT_THRIFT ] },
             permanent, infinity, worker , [ thrift_connection_pool ]
         },
+        httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
+        
         {ok, {{one_for_one, 5, 10}, [ThriftPool, Restarter, AuthDemon ]}}.  
