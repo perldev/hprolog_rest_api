@@ -347,9 +347,21 @@ store_result(Session ,R) ->
                     true
     end.
 
+api_callback_process_params({SomeThing}) when is_atom(SomeThing)->
+    atom_to_list( list_to_binary(SomeThing) )
+;
+api_callback_process_params(T) when is_number(T)->
+    T
+;
+api_callback_process_params(T) when is_list(T)->
+    unicode:characters_to_binary( T )
+.
+
+          
+    
 api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->    
                 [_| Params]     = list_to_tuple(ProtoType),
-                VarsRes = lists:map( fun api_var_match/1, Params ),
+                VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
                 case catch  httpc:request( post, { CallBackUrl,
@@ -374,7 +386,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->
 ;
 api_callback(false, Session,  ProtoType, CallBackUrl)->
                 [_| Params]     = list_to_tuple(ProtoType),
-                VarsRes = lists:map( fun api_var_match/1, Params ),
+                VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
                 case catch  httpc:request( post, { CallBackUrl,
@@ -400,7 +412,7 @@ api_callback(false, Session,  ProtoType, CallBackUrl)->
 ;
 api_callback(Res, Session,  _ProtoType, CallBackUrl)->
                 [_, Params]     = list_to_tuple(Res),
-                VarsRes = lists:map( fun api_var_match/1, Params ),
+                VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
                 case catch  httpc:request( post, { CallBackUrl,
