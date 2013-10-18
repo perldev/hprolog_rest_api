@@ -342,6 +342,7 @@ store_result(Session ,R) ->
 		    true;
              [{Session, Pid, _OldRes,ProtoType, Time, CallBackUrl } ]->
                     ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType, Time, CallBackUrl}),    
+                    httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
                     api_callback(R,Session,  ProtoType, CallBackUrl  ),
                     true
     end.
