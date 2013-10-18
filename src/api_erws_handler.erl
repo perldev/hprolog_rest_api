@@ -363,7 +363,8 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
-                case catch  httpc:request( post, { CallBackUrl,
+                
+                case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
                                     ]
@@ -388,7 +389,7 @@ api_callback(false, Session,  ProtoType, CallBackUrl)->
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
-                case catch  httpc:request( post, { CallBackUrl,
+                case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
                                     ]
@@ -414,7 +415,7 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl)->
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
                 Post = <<"params=",PrePost/binary>>,
-                case catch  httpc:request( post, { CallBackUrl,
+                case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
                                     ]
