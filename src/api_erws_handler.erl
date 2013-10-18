@@ -443,6 +443,14 @@ result(R)  ->
     list_to_binary ( lists:flatten( io_lib:format("~p",[R]) ) ).
 
 %%NOT ALLOW cyrrilic names
+proc_object([true])->
+      "true";
+proc_object([false])->
+      "false";
+proc_object([undefined])->
+      0;      
+proc_object([null])->
+      0;
 proc_object([{<<"atom">>, Name }])->
       list_to_atom( binary_to_list(Name));  
 proc_object([ { <<"name">>, Name}])->
