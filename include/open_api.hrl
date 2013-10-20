@@ -21,12 +21,20 @@
 
 -define(WORK_PORT,8313).
 -define(COUNT_LISTENERS,10).
+-define(API_SALT, salt).
+
+-define(FATAL_TIME_ONCE, 30000).
+-define(ERWS_API, api_table).
+
 
 -define(ETS_PUBLIC_SYSTEMS, public_ids).
 -define(ETS_PUBLIC_SYSTEMS_DETS, "../consoledb/public_ids.dets").
-
 -define(REGISTERED_FILE, "../consoledb/registered.ets" ).
 -define(REGISTERED_NAMESPACE, "../consoledb/namespaces.ets" ).
 -define(CACHE_CONNECTION, 10000 ).%miliseconds
 
 -define(QUEUE_PREFIX,"queue").
+
+
+-record(api_record, { id, aim_pid, result, prototype, start_time, callbackurl, api_salt, namespace, request_type }).
+

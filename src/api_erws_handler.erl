@@ -5,7 +5,7 @@
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
 
--export([start_new_aim/3,api_callback/4, start_link_session/4, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
+-export([start_new_aim/3,api_callback/5, start_link_session/6, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
@@ -26,26 +26,63 @@ handle(Req, State) ->
      {ok, NewReq, State}.
     
 
-start_link_session(Session, SourceMsg, NameSpace, CallBackUrl) ->
+start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
     Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
-    insert_req(NameSpace, Session),
-    ets:insert(?ERWS_LINK, {Session, Pid, wait, SourceMsg, now(), CallBackUrl}),       
-    ok.
+    insert_req(NameSpace, Session),    
+    ets:insert(?ERWS_API, #api_record{id = Session, 
+                                      aim_pid = Pid,
+                                      result = wait,
+                                      prototype = SourceMsg,
+                                      start_time=now(),
+                                      callbackurl = CallBackUrl,
+                                      api_salt = Salt,
+                                      namespace = NameSpace,
+                                      request_type = Type}),       
+    Pid.
 
-
-
-   
-start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
-    %TODO make key from server
-    NewSession = generate_session(), 
-    start_link_session(NewSession, Msg, NameSpace, CallBackUrl), 
-    process_req(NewSession, Msg),
-    jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]);
+start_once_aim({error, Description}, _NameSpace,_,_)->
+    Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
+    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
+start_once_aim(error, _NameSpace, _,_)->
+    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]);
+start_once_aim(Msg, NameSpace, undefined, BackPid)->
+        NewSession = erlang:make_ref(),
+        Pid = start_link_session(NewSession, Msg, NameSpace, undefined, undefined, {once, BackPid}), 
+        process_req(NewSession, Msg),
+        receive 
+            {result, false } ->
+                      jsx:encode( [ {status, false} ]);
+            {result, SomeThing} ->
+                     {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
+                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg, NewLocalContext}]),
+                     VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
+                     jsx:encode( [ {status, true}, {result, VarsRes}] )
+            after ?FATAL_TIME_ONCE ->
+                    exit(Pid, timeout),
+                    jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
+        end;
+start_once_aim(Msg, NameSpace, CallBackUrl, _BackPid)->
+        NewSession = generate_session(),
+        Salt =  api_auth_demon:get_api_salt(NameSpace),
+        start_link_session(NewSession, Msg, NameSpace, CallBackUrl, Salt, once), 
+        process_req(NewSession, Msg),
+        jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
+        
+        
+        
+        
 start_new_aim({error, Description}, _NameSpace,_)->
     Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
 start_new_aim(error, _NameSpace, _)->
-    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]).
+    jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]);
+start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
+    %TODO make key from server
+    NewSession = generate_session(),
+    Salt =  api_auth_demon:get_api_salt(NameSpace),
+    start_link_session(NewSession, Msg, NameSpace, CallBackUrl, Salt, call), 
+    process_req(NewSession, Msg),
+    jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
 
 api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
     {Key, list_to_binary( io_lib:format("~p",[Val]))};
@@ -67,20 +104,20 @@ api_var_match({ { Key }, Val}) when is_atom(Val)->
 api_var_match({ { Key }, Val}) -> 
    {Key, Val}.
 
-get_result(Session, NameSpace)->
-    case ets:lookup(?ERWS_LINK, Session) of 
+get_result(Session, _NameSpace)->
+    case ets:lookup(?ERWS_API, Session) of 
 	[]-> session_finished;
-	[{_, _Pid, wait, _ProtoType, _Time, _}] ->
+	[ #api_record{result =  wait } ] ->
 		result_not_ready;
-	[{_, Pid, false, _ProtoType, _Time, _}] ->
-                delete_session(Session, NameSpace ),
+	[ #api_record{result =  false, aim_pid = Pid}] ->
+                delete_session(Session ),
 		exit(Pid, finish),
 		false;
-	[{_, Pid, unexpected_error, _ProtoType, _Time, _  } ]->
-                delete_session(Session, NameSpace ),
+	[ #api_record{aim_pid = Pid, result = unexpected_error } ]->
+                delete_session(Session),
 		exit(Pid, finish),
 		unexpected_error;	
-	[{_,_,SomeThing, ProtoType, _Time, _}] ->
+	[ #api_record{result =  SomeThing, prototype=ProtoType }] ->
                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
 	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
 	        VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
@@ -139,14 +176,28 @@ generate_http_resp(Json, Req)->
 %     Resp = jsx:encode([{status,Res}, {description, <<"reload namespace">>}]),
 %     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
 
+% sync request
+api_handle_command([<<"once">>, NameSpace, Aim], Req) ->  %%TODO
+    ?API_LOG("~n New client ~p",[Req]),
+    {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
+    CallBack = proplists:get_value(<<"callback">>, PostVals),
+    Post = proplists:get_value(<<"params">>, PostVals),
+    
+    Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim)) ),    
+    ?WEB_REQS("~n generate aim ~p",[Msg]),
+    Response =  start_once_aim(Msg, binary_to_list(NameSpace), CallBack, self()),
+    ?LOG_INFO("~n send to client ~p",[Response]),
+    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
+        Response, Req3);
+
 api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
     Post = proplists:get_value(<<"params">>, PostVals),
-    Msg = generate_prolog_msg(Post, Aim),
+    Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim))),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response = start_new_aim(Msg, NameSpace,CallBack),
+    Response = start_new_aim(Msg, binary_to_list(NameSpace), CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req3);
@@ -155,14 +206,14 @@ api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
     ?LOG_INFO(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session), NameSpace),
     generate_http_resp(Result, Req);
-api_handle_command([<<"finish">>, NameSpace, Session], Req) ->
+api_handle_command([<<"finish">>, _NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-     generate_http_resp(delete_session(binary_to_list(Session), list_to_atom(NameSpace)), Req);
-api_handle_command([<<"next">>, NameSpace, Session], Req) ->
+     generate_http_resp(delete_session(binary_to_list(Session) ), Req);
+api_handle_command([<<"next">>, _NameSpace, Session], Req) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
-    Result = aim_next(binary_to_list(Session), list_to_atom(NameSpace)),
+    Result = aim_next(binary_to_list(Session)),
     generate_http_resp(Result, Req);
 api_handle_command(Path, Req) ->
     ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
@@ -217,9 +268,9 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
                             generate_http_resp(permissions_denied, Req1);
                         true  -> 
                             api_handle_command([ Cmd, NameSpace, SomeThing ], Req1);
-                    try_again ->                    
+                        try_again ->                    
                             generate_http_resp(try_again, Req1);
-                    system_off ->
+                        system_off ->
                             generate_http_resp(system_off, Req1)
                 end
     end
@@ -228,36 +279,36 @@ api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
      generate_http_resp(not_found, Req).
 
-aim_next(Session, AtomNS) ->
-    case ets:lookup(?ERWS_LINK, Session) of
-	    [{Session, _Pid, wait, _ProtoType,_StartTime, _}] ->
+aim_next(Session) ->
+    case ets:lookup(?ERWS_API, Session) of
+	    [ #api_record{result = wait} ] ->
 	        aim_in_process;
-	    [{Session, _Pid, Res, _ProtoType,_StartTime, _}] when is_atom(Res) ->
-	        delete_session(Session, AtomNS),
+	    [ #api_record{result = Res } ] when is_atom(Res) ->
+	        delete_session(Session),
 	        Res;
-	    [{Session, Pid, Res, ProtoType, StartTime, CallBack}] when is_tuple(Res) ->
+	    [ ApiRecord = #api_record{aim_pid= Pid, result = Res } ] when is_tuple(Res) ->
+                ets:insert(?ERWS_API, ApiRecord#api_record{result = wait}),          
 	        Pid ! {some_code, next},
-	        ets:insert(?ERWS_LINK, {Session, Pid, wait, ProtoType, StartTime, CallBack}),
 	        true;
 	    []->
 	        not_found
     end.
 
-delete_session(Session, AtomNS) ->
-    delete_req(AtomNS, Session),  
-    case ets:lookup(?ERWS_LINK, Session) of
-	    [{Session, Pid, _Status, _ProtoType, _StartTime, _CallBack}] ->
-	        ets:delete(?ERWS_LINK, Session),
+delete_session(Session) ->
+    case ets:lookup(?ERWS_API, Session) of
+	    [  #api_record{aim_pid = Pid, namespace = AtomNS}] ->
+	        ets:delete(?ERWS_API, Session),
+                delete_req(AtomNS, Session),  
 	        Pid ! {some_code, finish} ,
 	        true;
 	    []->
 		?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session]),
 		not_found
-	end.
- 
+    end.
+	
 process_req(Session, Msg)->
-      case ets:lookup(?ERWS_LINK, Session) of
-	  [ {Session, Pid,'wait',_ProtoType, _Time, _CallBack}] ->
+      case ets:lookup(?ERWS_API, Session) of
+	  [#api_record{result = wait, aim_pid = Pid}] ->
 		 Pid ! {some_code, Session, Msg},
 		 ?API_LOG("send back: ~p ~n ~p ~n ~p ~n~n", [Session, Pid, Msg]);
 	  []->
@@ -335,16 +386,27 @@ process_prove(Back, TempAim , Goal, Res, _StartTime, TreeEts)->
      end.
 
 store_result(Session ,R) ->
-    case ets:lookup(?ERWS_LINK, Session) of
+    case ets:lookup(?ERWS_API, Session) of
 	    []-> false;%TODO clean all 
-	    [{Session, Pid, _OldRes,ProtoType, Time,undefined } ]->
-		    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType ,Time, undefined}),
+	    [ ApiRecord = #api_record{callbackurl = undefined, request_type = call } ]->
+		    ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),
 		    true;
-             [{Session, Pid, _OldRes,ProtoType, Time, CallBackUrl } ]->
-                    ets:insert(?ERWS_LINK, {Session, Pid, R, ProtoType, Time, CallBackUrl}),    
+            [  #api_record{callbackurl = undefined,  request_type = { once, BackPid } } ]->
+                    ets:delete(?ERWS_API, Session),
+                    BackPid ! {result, R},            
+                    exit(normal);
+             [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
+                    case ApiRecord#api_record.request_type  of
+                        call ->
+                            ets:insert(?ERWS_API, ApiRecord#api_record{result = R} );
+                        once ->
+                            delete_session(Session)
+                    end,
+                    %%%TODO move to settings this LINE                    
                     httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
-                    api_callback(R,Session,  ProtoType, CallBackUrl  ),
-                    true
+                    api_callback(R, Session,  ApiRecord#api_record.prototype, 
+                                    CallBackUrl, ApiRecord#api_record.api_salt ),
+                    exit(normal)
     end.
 
 api_callback_process_params({SomeThing}) when is_atom(SomeThing)->
@@ -357,13 +419,22 @@ api_callback_process_params(T) when is_list(T)->
     unicode:characters_to_binary( T )
 .
 
+get_auth_salt(_Post, undefined )->
+    <<"">>
+;
+get_auth_salt(Post, Salt )->
+    CalcSalt  = binary_to_list( hexstring(crypto:hash(sha512, <<Post/binary,"__",Salt/binary>>)) ),
+    
+    <<"&auth=", CalcSalt/binary>>
+.
           
     
-api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->    
+api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->    
                 [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),
-                Post = <<"params=",PrePost/binary>>,
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
+                AuthSalt =  get_auth_salt(PrePost, Salt),
+                Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
                 
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
@@ -387,11 +458,12 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl )->
                 end
 
 ;
-api_callback(false, Session,  ProtoType, CallBackUrl)->
+api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
                 [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
-                Post = <<"params=",PrePost/binary>>,
+                AuthSalt =  get_auth_salt(PrePost, Salt),
+                Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -415,11 +487,12 @@ api_callback(false, Session,  ProtoType, CallBackUrl)->
 
 
 ;
-api_callback(Res, Session,  _ProtoType, CallBackUrl)->
+api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                 [_| Params]     = tuple_to_list(Res),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
-                Post = <<"params=",PrePost/binary>>,
+                AuthSalt =  get_auth_salt(PrePost, Salt),
+                Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -484,7 +557,7 @@ process_params(Aim, List)->
 	  {'EXIT',Description}->
 	      {error, Description};
 	  NewList ->
-	      list_to_tuple([list_to_atom(binary_to_list(Aim))|NewList])
+	      list_to_tuple([Aim|NewList])
 	end.
 
 generate_prolog_msg(Post, Aim)->
@@ -533,8 +606,7 @@ insert_req(NameSpace, SessionId) ->
             ?API_LOG("~p some exception during inserted to queue ~p",[{?MODULE,?LINE},  Exp ])
    end.
 
-delete_req(NameSpace, SessionId) when is_atom(NameSpace)->
-    delete_req(atom_to_list(NameSpace), SessionId);
+
 delete_req(NameSpace, SessionId)->
     AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
     case catch ets:delete(AtomNS, SessionId) of
@@ -542,3 +614,12 @@ delete_req(NameSpace, SessionId)->
         Reason ->?API_LOG("~p UNEXPECTED delete from queue ~p",[{?MODULE,?LINE}, {AtomNS, SessionId, Reason}])
     end.
 
+
+hexstring(<<X:128/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~32.16.0b", [X]));
+hexstring(<<X:160/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~40.16.0b", [X]));
+hexstring(<<X:256/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~64.16.0b", [X]));
+hexstring(<<X:512/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~128.16.0b", [X])).

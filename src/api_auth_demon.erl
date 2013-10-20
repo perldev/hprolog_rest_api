@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1 ]).
+-export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1, get_api_salt/1 ]).
 -export([   auth/2, 
             deauth/2, 
             low_auth/3, 
@@ -53,6 +53,7 @@ init([Application]) ->
         
         
         Auth = ets:new(api_auth_info, [named_table ,public ,set]),
+        ets:new(?ERWS_API,[named_table, public, set, {keypos,2} ]),
         
         {ok, #monitor {
                         application = Application,
@@ -169,6 +170,24 @@ get_name_space_info(Id)->
                 throw({'EXIT', public_system_not_existed})
        end.
 
+       
+get_api_salt(Id)->
+    case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
+       [{Id, _Name, Config}]->
+                case dict:find(?API_SALT, Config) of
+                    error -> undefined;
+                    {ok, Value}-> Value
+                end;
+    
+       []->
+                undefined
+    end
+.
+
+
+
+       
+       
 get_real_namespace_name(Id) ->
        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
             [{Id, _Name, _Config}]->
@@ -386,34 +405,28 @@ check_expired_sessions( Application )->
     
     case  application:get_env(Application, live_time_session) of
       {ok, ExpiredMiliSeconds} ->
-            Fun  =  fun one_expired/4,
-            NewKey = ets:first(?ERWS_LINK),
-            check_expired_key(NewKey, Fun, ?ERWS_LINK, ExpiredMiliSeconds),
+            Fun  =  fun one_expired/5,
+            NewKey = ets:first(?ERWS_API),
+            Now = now(),
+            check_expired_key(NewKey, Fun, ?ERWS_API, ExpiredMiliSeconds, Now),
             lists:foreach(fun clean_not_actual/1, NameSpaces);
        _->
         do_nothing
     end
 .
 
-one_expired(Body = {Session, Pid, _Res, _ProtoType, StartTime, _Call}, Table, Key, ExpiredMiliSeconds)->
-                                    Now = now(),
+one_expired(Body  = #api_record{id = Session,aim_pid =  Pid, start_time = StartTime}, Table, Key, ExpiredMiliSeconds, Now)->
                                     Diff = timer:now_diff(Now, StartTime),
                                     case  Diff> ExpiredMiliSeconds of
                                         true-> 
-                                        ?LOG_DEBUG("~p finish ~p expired aim  ~n", [{?MODULE,?LINE}, Body ]),
-                                            ets:delete(?ERWS_LINK, Session),
+                                           ?LOG_DEBUG("~p finish ~p expired aim  ~n", [{?MODULE,?LINE}, Body ]),
+                                            ets:delete(Table, Session),
                                             exit(Pid, expired_session),
                                             ets:first(Table);
                                         false->   
                                             ets:next(Table, Key)
                                     end
-
-
-;
-one_expired({_Session, _Pid, _Pid2, _,_Call}, Table, Key, _ExpiredMiliSeconds)->
-     ets:next(Table, Key)
 .
-
 
 clean_not_actual(NameSpace)->
     Key  = ets:first(NameSpace),    
@@ -422,7 +435,7 @@ clean_not_actual(NameSpace)->
 clean_not_actual('$end_of_table', _AtomNS) ->
     true;
 clean_not_actual(Key, AtomNS) ->
-    Req = ets:lookup(?ERWS_LINK, Key),
+    Req = ets:lookup(?ERWS_API, Key),
     case  Req of
         [] -> 
             ets:delete(AtomNS, Key),
@@ -434,17 +447,17 @@ clean_not_actual(Key, AtomNS) ->
 
   
 
-check_expired_key('$end_of_table', _Fun,  _Table, _E )->
+check_expired_key('$end_of_table', _Fun,  _Table, _E, _ )->
     finish;
-check_expired_key(Key, Fun, Table, ExpiredMiliSeconds)->
+check_expired_key(Key, Fun, Table, ExpiredMiliSeconds, Now)->
     
    case  catch ets:lookup(Table, Key) of
         [ Value ] ->
-            NewKey = Fun(Value, Table, Key, ExpiredMiliSeconds),
-            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds);
+            NewKey = Fun(Value, Table, Key, ExpiredMiliSeconds, Now),
+            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds, Now);
         []->
-            NewKey = ets:first(?ERWS_LINK),
-            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds)
+            NewKey = ets:first(Table),
+            check_expired_key(NewKey, Fun, Table, ExpiredMiliSeconds, Now)
     end
 .
 
@@ -457,7 +470,8 @@ sync_public_system(EtsTable, LForeign, Id,  Config)->
             prolog:memory2hbase( Id, Id);
         _ ->
             throw({'non_exist_the_source', LForeign, Config})
-   end,         
+   end,
+   
    true         
 .            
 
