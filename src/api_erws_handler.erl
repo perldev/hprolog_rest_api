@@ -404,7 +404,7 @@ store_result(Session ,R) ->
                             true;
                         once ->
                             delete_session(Session),
-                            httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
+%                             httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
                             api_callback(R, Session,  ApiRecord#api_record.prototype, 
                                     CallBackUrl, ApiRecord#api_record.api_salt ),
                             exit(normal)        
