@@ -185,7 +185,7 @@ api_handle_command([<<"once">>, NameSpace, Aim], Req) ->  %%TODO
     
     Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response =  start_once_aim(Msg, binary_to_list(NameSpace), CallBack, self()),
+    Response =  start_once_aim(Msg, NameSpace, CallBack, self()),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
         Response, Req3);
@@ -197,7 +197,7 @@ api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
     Post = proplists:get_value(<<"params">>, PostVals),
     Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim))),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response = start_new_aim(Msg, binary_to_list(NameSpace), CallBack),
+    Response = start_new_aim(Msg, NameSpace, CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req3);
@@ -422,9 +422,9 @@ api_callback_process_params(T) when is_list(T)->
 get_auth_salt(_Post, undefined )->
     <<"">>
 ;
-get_auth_salt(Post, Salt )->
-    CalcSalt  = binary_to_list( hexstring(crypto:hash(sha512, <<Post/binary,"__",Salt/binary>>)) ),
-    
+get_auth_salt(Post, SaltL )->
+    Salt = list_to_binary(SaltL),
+    CalcSalt  =  hexstring(crypto:sha512( <<Post/binary, Salt/binary>>) ) ,
     <<"&auth=", CalcSalt/binary>>
 .
           
