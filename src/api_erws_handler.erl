@@ -398,15 +398,18 @@ store_result(Session ,R) ->
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
                     case ApiRecord#api_record.request_type  of
                         call ->
-                            ets:insert(?ERWS_API, ApiRecord#api_record{result = R} );
+                            ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),
+                            api_callback(R, Session,  ApiRecord#api_record.prototype, 
+                                        CallBackUrl, ApiRecord#api_record.api_salt ),
+                            true;
                         once ->
-                            delete_session(Session)
-                    end,
-                    %%%TODO move to settings this LINE                    
-                    httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
-                    api_callback(R, Session,  ApiRecord#api_record.prototype, 
+                            delete_session(Session),
+                            httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
+                            api_callback(R, Session,  ApiRecord#api_record.prototype, 
                                     CallBackUrl, ApiRecord#api_record.api_salt ),
-                    exit(normal)
+                            exit(normal)        
+                            
+                    end
     end.
 
 api_callback_process_params({SomeThing}) when is_atom(SomeThing)->
@@ -424,7 +427,7 @@ get_auth_salt(_Post, undefined )->
 ;
 get_auth_salt(Post, SaltL )->
     Salt = list_to_binary(SaltL),
-    CalcSalt  =  hexstring(crypto:sha512( <<Post/binary, Salt/binary>>) ) ,
+    CalcSalt  =  hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ,
     <<"&auth=", CalcSalt/binary>>
 .
           
