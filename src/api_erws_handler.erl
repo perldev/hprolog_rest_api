@@ -181,7 +181,7 @@ api_handle_command([<<"once">>, NameSpace, Aim], Req) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
-    Post = proplists:get_value(<<"params">>, PostVals),
+    Post =  proplists:get_value(<<"params">>, PostVals) ,
     
     Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
@@ -438,13 +438,13 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-                
+               
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
                                     ],
                                     "application/x-www-form-urlencoded",
-                                     Post
+                                      cowboy_http:urlencode(Post)
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -472,7 +472,7 @@ api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
                                         {"Accept","application/json"}
                                     ],
                                      "application/x-www-form-urlencoded",
-                                     Post
+                                      cowboy_http:urlencode(Post)
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -501,7 +501,7 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                                         {"Accept","application/json"}
                                     ],
                                      "application/x-www-form-urlencoded",
-                                     Post
+                                      cowboy_http:urlencode(Post)
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -550,10 +550,8 @@ process_json_params(E) when is_number(E)->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-          NewE = binary:replace(E, [<<"+">>],<<" ">>,[global]), 
-	  List = http_uri:decode(binary_to_list(NewE) ),
-	  unicode:characters_to_list( list_to_binary(List) ).
-	  
+	  List = cowboy_http:decode(E ),
+	  unicode:characters_to_list( List ).
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
@@ -563,10 +561,10 @@ process_params(Aim, List)->
 	      list_to_tuple([Aim|NewList])
 	end.
 
-generate_prolog_msg(Post, Aim)->
+generate_prolog_msg(PrePost, Aim)->
     %proplists:get_value(<<"params">>, PostVals,undefined),
-    ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, Post]),
-    Json  = ( catch jsx:decode(Post) ),
+    ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, PrePost]),
+    Json  = ( catch jsx:decode(PrePost) ),
     ?LOG_INFO("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
 %    jsx:decode(<<"[1,{\"name\":1}]">>).
 %    [1,[{<<"name">>,1}]]
