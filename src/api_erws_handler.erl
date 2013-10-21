@@ -444,7 +444,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                                         {"Accept","application/json"}
                                     ],
                                     "application/x-www-form-urlencoded",
-                                      cowboy_http:urlencode(Post)
+                                      Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -472,7 +472,7 @@ api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
                                         {"Accept","application/json"}
                                     ],
                                      "application/x-www-form-urlencoded",
-                                      cowboy_http:urlencode(Post)
+                                      Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
@@ -501,7 +501,7 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                                         {"Accept","application/json"}
                                     ],
                                      "application/x-www-form-urlencoded",
-                                      cowboy_http:urlencode(Post)
+                                      Post
                                  },
                                     [ {connect_timeout,?CACHE_CONNECTION },
                                       {timeout, ?CACHE_CONNECTION }],
