@@ -396,15 +396,15 @@ store_result(Session ,R) ->
                     BackPid ! {result, R},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
+                    httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
                     case ApiRecord#api_record.request_type  of
                         call ->
-                            ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),
+                            ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
                             api_callback(R, Session,  ApiRecord#api_record.prototype, 
                                         CallBackUrl, ApiRecord#api_record.api_salt ),
                             true;
                         once ->
                             delete_session(Session),
-%                             httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
                             api_callback(R, Session,  ApiRecord#api_record.prototype, 
                                     CallBackUrl, ApiRecord#api_record.api_salt ),
                             exit(normal)        
