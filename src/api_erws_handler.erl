@@ -427,7 +427,7 @@ get_auth_salt(_Post, undefined )->
 ;
 get_auth_salt(Post, SaltL )->
     Salt = list_to_binary(SaltL),
-    CalcSalt  =  hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ,
+    CalcSalt  = list_to_binary( hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
     <<"&auth=", CalcSalt/binary>>
 .
           
