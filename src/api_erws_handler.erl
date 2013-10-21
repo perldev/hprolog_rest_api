@@ -550,7 +550,7 @@ process_json_params(E) when is_number(E)->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  List = cowboy_http:decode(E ),
+	  List = cowboy_http:urldecode(E ),
 	  unicode:characters_to_list( List ).
 
 process_params(Aim, List)->
