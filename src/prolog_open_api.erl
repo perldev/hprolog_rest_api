@@ -14,6 +14,7 @@ start() ->
     application:start(sasl),
     application:start(ranch),
     application:start(cowboy),
+    application:start(eprolog),
     application:start(prolog_open_api).
 
 stop() ->
