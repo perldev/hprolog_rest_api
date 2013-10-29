@@ -29,7 +29,10 @@
 		  registered_namespaces,
 		  registered_ip,
 		  auth_info,
-		  proc_table		  
+		  proc_table,
+		  registered_namespaces_file,
+                  registered_ip_file,
+                  public_ids_file
     }).
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
@@ -43,12 +46,7 @@ start_link(Application) ->
 init([Application]) ->
 	ets:new(system_state, [named_table, public]),
 	ets:insert(system_state, {prolog_api, on}),  
-	public_systems(),
-	{NameSpace, Registered } = load_tables(),	
 
-        
-        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, check_expired_sessions, [ Application]),
-        timer:apply_interval(?CACHE_CONNECTION, ?MODULE, cache_connections, []),
         timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
         
         
@@ -57,8 +55,6 @@ init([Application]) ->
         
         {ok, #monitor {
                         application = Application,
-                        registered_namespaces = NameSpace,
-                        registered_ip = Registered,
                         auth_info = Auth,
                         proc_table = ets:new( proc_table, [named_table ,public ,set] 
         )}}.
@@ -90,8 +86,10 @@ fill_config4public()->
 
 
 
-public_systems()->
-        case catch  ets:file2tab(?ETS_PUBLIC_SYSTEMS_DETS) of
+public_systems(Application)->
+        {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
+        %%TODO rewrite this for throw exception if file doesn't exist 
+        case catch  ets:file2tab(ETS_PUBLIC_SYSTEMS_DETS) of
             Res = {ok, ?ETS_PUBLIC_SYSTEMS}->
                  Res;
             _->
@@ -102,14 +100,18 @@ public_systems()->
 
 
 %%cach auth information
-load_tables()->
-        Registered  =  case catch ets:file2tab(?REGISTERED_FILE) of
+load_tables(Application)->
+
+        {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
+        {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
+%%TODO rewrite this for throw exception if file doesn't exist
+        Registered  =  case catch ets:file2tab(REGISTERED_FILE) of
 			        {ok, Tab} -> 
                                     Tab;	
 			        _ -> 
 			            ets:new(registered_ip, [named_table ,public ,set])
                        end,
-	 NameSpace  =  case catch ets:file2tab(?REGISTERED_NAMESPACE  ) of
+	 NameSpace  =  case catch ets:file2tab(REGISTERED_NAMESPACE  ) of
 			        {ok, Tab2} ->
 			            Tab2;	
 			        _ -> 
@@ -230,6 +232,13 @@ stop() ->
     gen_server:cast(?MODULE, stop).
 
 handle_cast({load_auth_info, Application }, State)->
+        public_systems(Application),   
+        {NameSpace, Registered } = load_tables(Application),       
+        {ok, CacheConnection} = application:get_env(Application, cache_connection ),
+        
+        timer:apply_interval(CacheConnection, ?MODULE, check_expired_sessions, [ Application]),
+        timer:apply_interval(CacheConnection, ?MODULE, cache_connections, []),    
+            
         case application:get_env(Application, auth_list) of
                {ok, AuthList} ->
                     ets:insert(api_auth_info, AuthList),
@@ -263,7 +272,18 @@ handle_cast({load_auth_info, Application }, State)->
                                              end
                                             
                                         end,[], State#monitor.registered_namespaces),
-{noreply, State};
+        {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
+        {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
+        {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
+        
+{noreply, State#monitor{
+                  registered_namespaces_file = REGISTERED_NAMESPACE ,
+                  registered_ip_file = REGISTERED_FILE,
+                  public_ids_file = ETS_PUBLIC_SYSTEMS_DETS,
+                  registered_namespaces = NameSpace,
+                  registered_ip = Registered
+
+}};
 
 handle_cast({save_public_system, Id, LForeign, EtsTable}, State)->
     case ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
@@ -322,9 +342,11 @@ handle_cast({change_status, Ip, NameSpace, Status}, State) ->
     
 
 handle_cast(cache_connections, S)->
-    ets:tab2file(S#monitor.registered_namespaces, ?REGISTERED_NAMESPACE ),
-    ets:tab2file(S#monitor.registered_ip, ?REGISTERED_FILE ),
-    ets:tab2file(?ETS_PUBLIC_SYSTEMS, ?ETS_PUBLIC_SYSTEMS_DETS ),
+    
+
+    ets:tab2file(S#monitor.registered_namespaces, S#monitor.registered_namespaces_file ),
+    ets:tab2file(S#monitor.registered_ip, S#monitor.registered_ip_file ),
+    ets:tab2file(?ETS_PUBLIC_SYSTEMS, S#monitor.public_ids_file ),
     {noreply, S};
 handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
 	  %TODO reloading various namespaces

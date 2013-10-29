@@ -437,7 +437,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-               
+                 
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -445,8 +445,8 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                                     "application/x-www-form-urlencoded",
                                       Post
                                  },
-                                    [ {connect_timeout,?CACHE_CONNECTION },
-                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {connect_timeout,?HTTP_TIMEOUT },
+                                      {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
                             ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
@@ -473,8 +473,8 @@ api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
                                      "application/x-www-form-urlencoded",
                                       Post
                                  },
-                                    [ {connect_timeout,?CACHE_CONNECTION },
-                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {connect_timeout,?HTTP_TIMEOUT },
+                                      {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
                             ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
@@ -502,8 +502,8 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                                      "application/x-www-form-urlencoded",
                                       Post
                                  },
-                                    [ {connect_timeout,?CACHE_CONNECTION },
-                                      {timeout, ?CACHE_CONNECTION }],
+                                    [ {connect_timeout,?HTTP_TIMEOUT },
+                                      {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
                             ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),

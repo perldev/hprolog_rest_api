@@ -23,15 +23,18 @@
 -define(COUNT_LISTENERS,10).
 -define(API_SALT, salt).
 
--define(FATAL_TIME_ONCE, 30000).
+-define(FATAL_TIME_ONCE, 30000).%% TODO add to config 
 -define(ERWS_API, api_table).
 
 
+-define(HTTP_TIMEOUT, 10000).
+
 -define(ETS_PUBLIC_SYSTEMS, public_ids).
--define(ETS_PUBLIC_SYSTEMS_DETS, "../consoledb/public_ids.dets").
--define(REGISTERED_FILE, "../consoledb/registered.ets" ).
--define(REGISTERED_NAMESPACE, "../consoledb/namespaces.ets" ).
--define(CACHE_CONNECTION, 10000 ).%miliseconds
+%%% TODO move to config
+%-define(ETS_PUBLIC_SYSTEMS_DETS, "./public_ids.dets").
+%-define(REGISTERED_FILE, "./registered.ets" ).
+%-define(REGISTERED_NAMESPACE, "./namespaces.ets" ).
+%-define(CACHE_CONNECTION, 10000 ).%miliseconds
 
 -define(QUEUE_PREFIX,"queue").
 
