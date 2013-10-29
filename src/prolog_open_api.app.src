@@ -10,7 +10,8 @@
                     lager,
                     crypto,
                     compiler,
-                    syntax_tools
+                    syntax_tools,
+                    eprolog
     ]},
   {mod, { prolog_open_api_app, []}},
   {env, [ 

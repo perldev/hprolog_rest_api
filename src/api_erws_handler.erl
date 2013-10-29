@@ -396,7 +396,6 @@ store_result(Session ,R) ->
                     BackPid ! {result, R},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
-%                     httpc:set_options([  {   proxy,  {   { "proxy.ceb.loc",3128 } ,[]  }  } ] ),
                     case ApiRecord#api_record.request_type  of
                         call ->
                             ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
