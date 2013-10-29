@@ -38,7 +38,7 @@ make_requests(AtomNS) ->
 make_requests([], Acc) ->
     Acc;
 make_requests([{Session}|T], Acc) ->
-    Req = ets:lookup(?ERWS_LINK, Session),
+    Req = ets:lookup(?ERWS_API, Session),
     make_requests(T, [Req|Acc]).
     
 get_namespaces() ->
