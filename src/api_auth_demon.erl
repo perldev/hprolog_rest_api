@@ -8,7 +8,7 @@
             low_auth/3, 
             try_auth/2, 
             low_stop_auth/3,
-            check_auth/2, 
+            check_auth/4, 
             add_auth/2,
             start_queue/1,
             stop_queue/1,
@@ -19,8 +19,9 @@
             check_expired_sessions/1,
             regis_public_system/3,
             save_public_system/3,
-            get_real_namespace_name/1,
-            get_name_space_info/1]
+            get_namespace_config/1,
+            get_name_space_info/1,
+            hexstring/1]
        ).
 
 
@@ -93,7 +94,8 @@ public_systems(Application)->
             Res = {ok, ?ETS_PUBLIC_SYSTEMS}->
                  Res;
             _->
-                ets:new(?ETS_PUBLIC_SYSTEMS,[set, public, named_table])
+                load_backup(?ETS_PUBLIC_SYSTEMS, Application)
+%                 ets:new(?ETS_PUBLIC_SYSTEMS,[set, public, named_table])
          end
 .
 
@@ -109,17 +111,29 @@ load_tables(Application)->
 			        {ok, Tab} -> 
                                     Tab;	
 			        _ -> 
-			            ets:new(registered_ip, [named_table ,public ,set])
+                                        load_backup(registered_ip, Application)
+%                                         ets:new(registered_ip, [named_table ,public ,set])
                        end,
 	 NameSpace  =  case catch ets:file2tab(REGISTERED_NAMESPACE  ) of
 			        {ok, Tab2} ->
 			            Tab2;	
 			        _ -> 
-			            ets:new(registered_namespaces , [named_table ,public ,set])
+                                    load_backup(registered_namespaces, Application)
+                                    
+% 			            ets:new(registered_namespaces , [named_table ,public ,set])
 	end,
-
-	
         {NameSpace, Registered}.      
+
+load_backup(registered_ip, Application)->
+     {ok, REGISTERED_FILE} = application:get_env(Application, registered_ip_backup),
+     ets:file2tab(REGISTERED_FILE);
+load_backup(registered_namespaces, Application)->
+     {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespaces_backup),
+     ets:file2tab(REGISTERED_NAMESPACE);     
+load_backup(?ETS_PUBLIC_SYSTEMS, Application)->
+     {ok, REGISTERED_NAMESPACE} = application:get_env(Application, ?ETS_PUBLIC_SYSTEMS_BACKUP),
+     ets:file2tab(REGISTERED_NAMESPACE).            
+        
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -190,12 +204,12 @@ get_api_salt(Id)->
 
        
        
-get_real_namespace_name(Id) ->
+get_namespace_config(Id) ->
        case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
-            [{Id, _Name, _Config}]->
-                Id;
+            [{Id, _Name, Config}]->
+                Config;
             []->
-                throw({'EXIT', public_system_not_existed})
+                error
        end.
 
 
@@ -395,20 +409,56 @@ deauth(Ip, NameSpace )->
     gen_server:cast(?MODULE,{deauth, Ip, NameSpace}).
 
 
-check_auth(Ip, NameSpace) when is_binary(NameSpace) ->
-    check_auth(Ip, binary_to_list(NameSpace));
-    
-check_auth(Ip, NameSpace) ->
+
+check_auth(Ip, NameSpace, Config, Params) ->
     EtsRegis = registered_ip,
     State = check_system_state(),
     Res = case {ets:lookup(EtsRegis, {NameSpace, Ip}), State} of 
-        {[{{NameSpace, Ip}, {status, on}, _}], true} -> true; %normal
+        {[{{NameSpace, Ip}, {status, on}, _}], true} -> check_req_salt(Config, Params); %normal
 	{[{{NameSpace, Ip}, {status, on}, _}], false} -> system_off; % state off
 	{[{{NameSpace, Ip}, {status, off}, _}], false} -> system_off; % state off 
         {[{{NameSpace, Ip}, {status, off}, _}], true} -> try_again;
         {[], _} -> false
     end,
     Res.
+    
+check_req_salt(Config, Params)->
+          case dict:find('auth_salt', Config)   of
+            error -> true;
+            {ok, ApiSalt}->
+                    [Cmd, Path, Params, AuthInfo] = Params,
+                    case AuthInfo of
+                            undefined -> false;
+                            AuthInfo -> compare_req_salt(Cmd, Params, Path, AuthInfo, ApiSalt)
+                    end        
+         end
+.
+
+compare_req_salt(<<"once">>, Params, Path, AuthInfo, ApiSalt )->
+            compare_req_salt(<<"create">>,Params, Path, AuthInfo, ApiSalt )
+;
+compare_req_salt(<<"create">>, undefined, _Path, _AuthInfo, _ApiSalt )->
+            false
+;
+compare_req_salt(<<"create">>, Params, _Path, AuthInfo, ApiSalt )->
+            Post = cowboy_http:urldecode(Params), 
+            Salt = list_to_binary(ApiSalt),
+            AuthInfo  =:= list_to_binary( hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) 
+;
+compare_req_salt(_,_Post, UrlPath, AuthInfo, ApiSalt)->
+
+            Salt = list_to_binary(ApiSalt),
+            AuthInfo  =:= list_to_binary( hexstring( crypto:hash(sha512, <<UrlPath/binary, Salt/binary>>) ) ) 
+
+.
+hexstring(<<X:128/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~32.16.0b", [X]));
+hexstring(<<X:160/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~40.16.0b", [X]));
+hexstring(<<X:256/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~64.16.0b", [X]));
+hexstring(<<X:512/big-unsigned-integer>>) ->
+    lists:flatten(io_lib:format("~128.16.0b", [X])).
 
 check_system_state() ->
     [{prolog_api, on}] =:= ets:lookup(system_state, prolog_api).

@@ -28,7 +28,7 @@
 
 
 -define(HTTP_TIMEOUT, 10000).
-
+-define(ETS_PUBLIC_SYSTEMS_BACKUP, ets_public_system_backup ).
 -define(ETS_PUBLIC_SYSTEMS, public_ids).
 %%% TODO move to config
 %-define(ETS_PUBLIC_SYSTEMS_DETS, "./public_ids.dets").

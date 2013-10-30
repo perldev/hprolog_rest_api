@@ -177,11 +177,10 @@ generate_http_resp(Json, Req)->
 %     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
 
 % sync request
-api_handle_command([<<"once">>, NameSpace, Aim], Req) ->  %%TODO
+api_handle_command([<<"once">>, NameSpace, Aim], Req, Post) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
-    Post =  proplists:get_value(<<"params">>, PostVals) ,
     
     Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
@@ -190,32 +189,31 @@ api_handle_command([<<"once">>, NameSpace, Aim], Req) ->  %%TODO
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
         Response, Req3);
 
-api_handle_command([<<"create">>, NameSpace, Aim], Req) ->  %%TODO
+api_handle_command([<<"create">>, NameSpace, Aim], Req, Post) ->  %%TODO
     ?API_LOG("~n New client ~p",[Req]),
     {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
-    Post = proplists:get_value(<<"params">>, PostVals),
     Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim))),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, NameSpace, CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
 	Response, Req3);
-api_handle_command([<<"process">>, NameSpace, Session], Req) ->    %%TODO
+api_handle_command([<<"process">>, NameSpace, Session], Req, _Params) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session), NameSpace),
     generate_http_resp(Result, Req);
-api_handle_command([<<"finish">>, _NameSpace, Session], Req) ->
+api_handle_command([<<"finish">>, _NameSpace, Session], Req, _Params) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
      generate_http_resp(delete_session(binary_to_list(Session) ), Req);
-api_handle_command([<<"next">>, _NameSpace, Session], Req) ->
+api_handle_command([<<"next">>, _NameSpace, Session], Req, _Params) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE},Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
     Result = aim_next(binary_to_list(Session)),
     generate_http_resp(Result, Req);
-api_handle_command(Path, Req) ->
+api_handle_command(Path, Req, _Params) ->
     ?LOG_WARNING(" Req: ~p ~n", [{Path, Req}]),
      generate_http_resp(not_found, Req).
      
@@ -230,44 +228,37 @@ api_handle_command2([<<"stop_auth">>, NameSpace], Req, _) ->
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
     generate_http_resp(api_auth_demon:deauth(Ip, NameSpace), Req1).
     
-% api_handle_command2(Path = [<<"reload">>, NameSpace], Req, _ ) ->
-%     ?LOG_INFO("Reload namespace: ~p~n", [NameSpace]),
-%     {{Ip,_}, Req1} = cowboy_req:peer(Req),
-%     case api_auth_demon:check_auth(Ip, NameSpace) of
-% 	    false -> 
-%             generate_http_resp(permissions_denied, Req1);
-%         true -> 
-%             api_auth_demon:change_status(Ip, NameSpace, {status, off}),  
-%             Result = api_handle_command(Path, Req),
-%             api_auth_demon:change_status(Ip, NameSpace, {status, on}),
-%             Result;
-%         try_again ->
-%             generate_http_resp(try_again, Req1);
-% 	system_off ->
-% 	    generate_http_resp(system_off, Req1)
-%     end.
+
     
 api_handle([Cmd, ID], Req, State) ->   
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
-     case catch api_auth_demon:get_real_namespace_name(binary_to_list(ID)) of
-        {'EXIT', _}->
+     IDL = binary_to_list(ID),
+     case api_auth_demon:get_namespace_config(IDL) of
+         error ->
                 generate_http_resp(not_found, Req);
-        NameSpace ->
-                api_handle_command2([Cmd, NameSpace], Req, State)
+        _Config ->
+                api_handle_command2([Cmd, IDL], Req, State)
                 
     end;
 api_handle([Cmd, ID, SomeThing], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
-    {{Ip,_}, Req1} = cowboy_req:peer(Req),
-    case catch api_auth_demon:get_real_namespace_name(binary_to_list(ID)) of
-        {'EXIT', _}->
+    {{Ip,_}, Req1_} = cowboy_req:peer(Req),
+    {ok, PostVals, Req2_} = cowboy_req:body_qs(Req1_),
+    
+    
+    AuthInfo = proplists:get_value(<<"auth">>, PostVals),
+    Params = proplists:get_value(<<"params">>, PostVals),
+    {Path, Req1} =cowboy_req:path(Req2_),
+    NameSpace = binary_to_list(ID),
+    case catch api_auth_demon:get_namespace_config( ) of
+        error ->
                 generate_http_resp(not_found, Req1);
-        NameSpace ->
-                case api_auth_demon:check_auth(Ip, NameSpace) of
+        ConfigNameSpace ->
+                case api_auth_demon:check_auth(Ip, NameSpace, ConfigNameSpace, [Cmd, Path, Params, AuthInfo]) of
                         false -> 
                             generate_http_resp(permissions_denied, Req1);
                         true  -> 
-                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1);
+                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1, Params);
                         try_again ->                    
                             generate_http_resp(try_again, Req1);
                         system_off ->
@@ -278,7 +269,9 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
 api_handle(Path, Req, _) ->
     ?LOG_WARNING("Path: ~p Req: ~p~n", [Path, Req]),
      generate_http_resp(not_found, Req).
+     
 
+     
 aim_next(Session) ->
     case ets:lookup(?ERWS_API, Session) of
 	    [ #api_record{result = wait} ] ->
@@ -426,7 +419,7 @@ get_auth_salt(_Post, undefined )->
 ;
 get_auth_salt(Post, SaltL )->
     Salt = list_to_binary(SaltL),
-    CalcSalt  = list_to_binary( hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
+    CalcSalt  = list_to_binary( api_auth_demon:hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
     <<"&auth=", CalcSalt/binary>>
 .
           
@@ -615,11 +608,4 @@ delete_req(NameSpace, SessionId)->
     end.
 
 
-hexstring(<<X:128/big-unsigned-integer>>) ->
-    lists:flatten(io_lib:format("~32.16.0b", [X]));
-hexstring(<<X:160/big-unsigned-integer>>) ->
-    lists:flatten(io_lib:format("~40.16.0b", [X]));
-hexstring(<<X:256/big-unsigned-integer>>) ->
-    lists:flatten(io_lib:format("~64.16.0b", [X]));
-hexstring(<<X:512/big-unsigned-integer>>) ->
-    lists:flatten(io_lib:format("~128.16.0b", [X])).
+
