@@ -95,7 +95,6 @@ public_systems(Application)->
                  Res;
             _->
                 load_backup(?ETS_PUBLIC_SYSTEMS, Application)
-%                 ets:new(?ETS_PUBLIC_SYSTEMS,[set, public, named_table])
          end
 .
 
@@ -112,7 +111,6 @@ load_tables(Application)->
                                     Tab;	
 			        _ -> 
                                         load_backup(registered_ip, Application)
-%                                         ets:new(registered_ip, [named_table ,public ,set])
                        end,
 	 NameSpace  =  case catch ets:file2tab(REGISTERED_NAMESPACE  ) of
 			        {ok, Tab2} ->
@@ -120,19 +118,22 @@ load_tables(Application)->
 			        _ -> 
                                     load_backup(registered_namespaces, Application)
                                     
-% 			            ets:new(registered_namespaces , [named_table ,public ,set])
 	end,
         {NameSpace, Registered}.      
 
 load_backup(registered_ip, Application)->
      {ok, REGISTERED_FILE} = application:get_env(Application, registered_ip_backup),
-     ets:file2tab(REGISTERED_FILE);
+     {ok, Tab} =  ets:file2tab(REGISTERED_FILE),
+     Tab;
 load_backup(registered_namespaces, Application)->
      {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespaces_backup),
-     ets:file2tab(REGISTERED_NAMESPACE);     
+     {ok,Tab} = ets:file2tab(REGISTERED_NAMESPACE),
+     Tab;
 load_backup(?ETS_PUBLIC_SYSTEMS, Application)->
      {ok, REGISTERED_NAMESPACE} = application:get_env(Application, ?ETS_PUBLIC_SYSTEMS_BACKUP),
-     ets:file2tab(REGISTERED_NAMESPACE).            
+     {ok, Tab} = ets:file2tab(REGISTERED_NAMESPACE),
+     Tab.
+         
         
 
 code_change(_OldVsn, State, _Extra) ->
@@ -278,14 +279,14 @@ handle_cast({load_auth_info, Application }, State)->
                                                                     _ ->
                                                                         throw({'non_exist_the_source', NameSpaceName, Config})
                                                             end,   
-                                                            ets:insert(State#monitor.registered_namespaces, {NameSpaceName, now()}),
+                                                            ets:insert(NameSpace, {NameSpaceName, now()}),
                                                             [NameSpaceName|In];
                                                  _->
                                                    ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
                                                    In                                                 
                                              end
                                             
-                                        end,[], State#monitor.registered_namespaces),
+                                        end,[], NameSpace),
         {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
         {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
         {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
@@ -543,7 +544,6 @@ sync_public_system(EtsTable, LForeign, Id,  Config)->
         _ ->
             throw({'non_exist_the_source', LForeign, Config})
    end,
-   
    true         
 .            
 
