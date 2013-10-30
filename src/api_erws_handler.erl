@@ -250,7 +250,7 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
     Params = proplists:get_value(<<"params">>, PostVals),
     {Path, Req1} =cowboy_req:path(Req2_),
     NameSpace = binary_to_list(ID),
-    case catch api_auth_demon:get_namespace_config(ID ) of
+    case catch api_auth_demon:get_namespace_config( NameSpace ) of
         error ->
                 generate_http_resp(not_found, Req1);
         ConfigNameSpace ->
