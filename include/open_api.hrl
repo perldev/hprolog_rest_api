@@ -23,7 +23,7 @@
 -define(COUNT_LISTENERS,10).
 -define(API_SALT, salt).
 
--define(FATAL_TIME_ONCE, 30000).%% TODO add to config 
+-define(FATAL_TIME_ONCE, 600000).%% TODO add to config 
 -define(ERWS_API, api_table).
 
 
