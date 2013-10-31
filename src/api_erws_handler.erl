@@ -180,7 +180,6 @@ generate_http_resp(Json, Req)->
 api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params}) ->  %%TODO
     ?API_LOG("~n New client ~p",[{Req3, PostVals}]),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
-    
     Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response =  start_once_aim(Msg, NameSpace, CallBack, self()),
@@ -540,8 +539,8 @@ process_json_params(E) when is_number(E)->
 process_json_params(E) when is_list(E)->
 	  proc_object(E);
 process_json_params(E) when is_binary(E)->
-	  List = cowboy_http:urldecode(E ),
-	  unicode:characters_to_list( List ).
+% 	  List = cowboy_http:urldecode(E ),
+	  unicode:characters_to_list( E ).
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
