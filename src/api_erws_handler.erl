@@ -177,23 +177,21 @@ generate_http_resp(Json, Req)->
 %     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
 
 % sync request
-api_handle_command([<<"once">>, NameSpace, Aim], Req, Post) ->  %%TODO
-    ?API_LOG("~n New client ~p",[Req]),
-    {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
+api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params}) ->  %%TODO
+    ?API_LOG("~n New client ~p",[{Req3, PostVals}]),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
     
-    Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim)) ),    
+    Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response =  start_once_aim(Msg, NameSpace, CallBack, self()),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
         Response, Req3);
 
-api_handle_command([<<"create">>, NameSpace, Aim], Req, Post) ->  %%TODO
-    ?API_LOG("~n New client ~p",[Req]),
-    {ok, PostVals, Req3} = cowboy_req:body_qs(Req),
+api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params}) ->  %%TODO
+    ?API_LOG("~n New client ~p",[{Req3, PostVals}]),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
-    Msg = generate_prolog_msg(Post, list_to_atom(binary_to_list(Aim))),    
+    Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim))),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, NameSpace, CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
@@ -258,7 +256,7 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
                         false -> 
                             generate_http_resp(permissions_denied, Req1);
                         true  -> 
-                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1, Params);
+                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1, {PostVals, Params } );
                         try_again ->                    
                             generate_http_resp(try_again, Req1);
                         system_off ->
