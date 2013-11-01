@@ -311,7 +311,7 @@ start_shell_process(Session, NameSpace)->
     IsHbase = api_auth_demon:get_source(NameSpace),
     ets:insert(NewTree, {system_record, hbase, IsHbase}),
     ets:insert(NewTree, {system_record, ?PREFIX, NameSpace}),
-    
+
     shell_loop(start, NewTree, Session).
 
       
@@ -389,6 +389,7 @@ store_result(Session ,R) ->
                     BackPid ! {result, R},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
+                    ?API_LOG("~p process callback   ~p",[{?MODULE,?LINE}, ApiRecord]),
                     case ApiRecord#api_record.request_type  of
                         call ->
                             ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
@@ -430,7 +431,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-                 
+                
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
