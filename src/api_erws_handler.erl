@@ -308,7 +308,10 @@ process_req(Session, Msg)->
 %%TODO rework
 start_shell_process(Session, NameSpace)->
     NewTree = ets:new(treeEts,[ public, set, { keypos, 2}]),
+    IsHbase = api_auth_demon:get_source(NameSpace),
+    ets:insert(NewTree, {system_record, hbase, IsHbase}),
     ets:insert(NewTree, {system_record, ?PREFIX, NameSpace}),
+    
     shell_loop(start, NewTree, Session).
 
       

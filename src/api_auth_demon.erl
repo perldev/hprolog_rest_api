@@ -21,6 +21,7 @@
             save_public_system/3,
             get_namespace_config/1,
             get_name_space_info/1,
+            get_source/1,
             hexstring/1]
        ).
 
@@ -98,7 +99,16 @@ public_systems(Application)->
          end
 .
 
-
+get_source(NameSpace)->
+    [{Key, Second, Dict}]= ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpace),
+    case dict:find(source, Dict) of
+         {ok, hbase }  ->
+            1;
+          _->
+            0
+    end      
+    
+.
 
 %%cach auth information
 load_tables(Application)->
