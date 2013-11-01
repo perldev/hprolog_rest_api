@@ -527,20 +527,23 @@ proc_object(List) when is_list(List)->
     
     
 process_json_params(true)->
-      "true";
+      true;
 process_json_params(false)->
-      "false";
+      false;
 process_json_params(undefined)->
-      0;      
+       "";
+process_json_params(<<"null">>)->
+       "";        
+process_json_params("null")->
+       "";       
 process_json_params(null)->
-      0;    
+       "";    
 process_json_params(E) when is_number(E)->
-          E;    
+       E;    
 process_json_params(E) when is_list(E)->
-	  proc_object(E);
+       proc_object(E);
 process_json_params(E) when is_binary(E)->
-% 	  List = cowboy_http:urldecode(E ),
-	  unicode:characters_to_list( E ).
+       unicode:characters_to_list( E ).
 
 process_params(Aim, List)->
 	case catch lists:map(fun process_json_params/1, List) of
@@ -551,12 +554,9 @@ process_params(Aim, List)->
 	end.
 
 generate_prolog_msg(PrePost, Aim)->
-    %proplists:get_value(<<"params">>, PostVals,undefined),
     ?LOG_INFO("~p got params ~p ~n",[{?MODULE,?LINE}, PrePost]),
     Json  = ( catch jsx:decode(PrePost) ),
     ?LOG_INFO("~p got from parsing ~p ~n",[{?MODULE,?LINE}, Json]),
-%    jsx:decode(<<"[1,{\"name\":1}]">>).
-%    [1,[{<<"name">>,1}]]
     case Json of
 	    {'EXIT', _ } -> error;
 	    List when is_list(List)->
