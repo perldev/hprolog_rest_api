@@ -68,7 +68,7 @@ graph(<<"get">>, Req) ->
 
 %% Get requests     ok
 requests(<<"get">>, Req) ->
-    NameSpace = list_to_atom(?QUEUE_PREFIX ++ binary_to_list(proplists:get_value(<<"namespace">>, Req))),
+    NameSpace = binary_to_list(proplists:get_value(<<"namespace">>, Req)),
     {ok, {Count, Data}} = prolog_open_api_statistics:get_requests(NameSpace),
     %%io:format("requests count: ~p data: ~p~n", [Count, Data]),
     {to_peer, lists:flatten([{<<"requests">>, Data}, {<<"count">>, Count}|Req])}.

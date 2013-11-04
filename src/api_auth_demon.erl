@@ -10,8 +10,6 @@
             low_stop_auth/3,
             check_auth/4, 
             add_auth/2,
-            start_queue/1,
-            stop_queue/1,
             cache_connections/0,
             change_status/3,
             fill_config4public/0,
@@ -230,20 +228,13 @@ save_public_system( Id, LForeign, EtsTable)->
 regis_public_system(Id, LForeign, Source)->
      gen_server:cast(?MODULE, {regis_public_system ,Id, LForeign, Source }).
 
-stop_queue(NameSpace)->
-    gen_server:cast(?MODULE, {stop_queue, NameSpace}).
-    
-start_queue(NameSpace)->
-    gen_server:cast(?MODULE, {start_queue, NameSpace}).
-
 start_namespace(State, NameSpace, Ip)->
     EtsRegis = State#monitor.registered_ip,
     EtsNameSpace = State#monitor.registered_namespaces,
     ets:insert(EtsRegis, {{NameSpace, Ip}, {status, on}, now()}),    
     case ets:lookup(EtsNameSpace, NameSpace) of
 	    [] -> 
-                prolog_shell:api_start(NameSpace),
-                api_auth_demon:start_queue(NameSpace),
+                (catch prolog_shell:api_start(NameSpace) ),
 		ets:insert(EtsNameSpace,  {NameSpace, now()}),
 		true;
 	    _-> true
@@ -273,30 +264,28 @@ handle_cast({load_auth_info, Application }, State)->
                     ets:insert(api_auth_info, [])
         end,
         ets:foldl(fun({NameSpaceName, _Time}, In) ->  
-                                            ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
-                                            case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
-                                                 [{_, _, Config  } ]->
+                 ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
+                  case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
+                                [{_, _, Config  } ]->
                                                              case dict:find(source, Config) of
                                                                     {ok, {file, Path} }->
                                                                          ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
                                                                          ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
-                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate ,ets:file2tab(Path) }]),
-                                                                         start_queue(NameSpaceName);
+                                                                         ResCreateTab = (catch ets:file2tab(Path)),
+                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
                                                                     {ok, hbase}->
                                                                         ?LOG_DEBUG("load namespace from hbase  ~n",[]),
-                                                                         start_queue(NameSpaceName), 
-                                                                         prolog_shell:api_start(NameSpaceName);
+                                                                         spawn(prolog_shell, api_start, [NameSpaceName] );
                                                                     _ ->
                                                                         throw({'non_exist_the_source', NameSpaceName, Config})
                                                             end,   
                                                             ets:insert(NameSpace, {NameSpaceName, now()}),
                                                             [NameSpaceName|In];
-                                                 _->
+                                 _->
                                                    ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
                                                    In                                                 
-                                             end
-                                            
-                                        end,[], NameSpace),
+                            end
+                    end,[], NameSpace),
         {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
         {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
         {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
@@ -332,33 +321,6 @@ handle_cast({regis_public_system, Id, Foreign, Source = {file, _} }, State)->
     ets:insert(?ETS_PUBLIC_SYSTEMS, { Id, Foreign, NewConfig1 } ),   
     {noreply, State}
 ;   
-handle_cast({start_queue, X}, State)->
-    
-    Opts = [named_table, public, {write_concurrency,true}, {read_concurrency,true}],
-    AtomName = list_to_atom(?QUEUE_PREFIX++X),
-    ets:new(AtomName, Opts), %%queue 
-    case application:get_env(State#monitor.application, queue) of
-        undefined ->
-            application:set_env(State#monitor.application, queue, [AtomName]);
-        {ok,List} ->
-            application:set_env(State#monitor.application, queue, [AtomName|List])
-    end,
-    {noreply, State}
-;
-handle_cast({stop_queue, X}, State)->
-    
-    AtomName = list_to_atom(?QUEUE_PREFIX++X),
-    ets:delete(AtomName), %%queue 
-    case application:get_env(State#monitor.application, queue) of
-        undefined ->
-            application:set_env(State#monitor.application, queue, []);
-        {ok,List} ->
-            NewList = lists:delete(AtomName, List),
-            application:set_env(State#monitor.application, queue, NewList)
-    end,
-
-    {noreply, State}
-;
 handle_cast({change_status, Ip, NameSpace, Status}, State) ->
     ?LOG_DEBUG("change status ip: ~p; namespace: ~p; status: ~p~n", [Ip, NameSpace, Status]),
     EtsRegis = State#monitor.registered_ip,
@@ -375,7 +337,6 @@ handle_cast(cache_connections, S)->
     {noreply, S};
 handle_cast( { deauth,  Ip, NameSpace }, MyState) ->
 	  %TODO reloading various namespaces
-	 api_auth_demon:stop_queue(NameSpace), 
 	 low_stop_auth(MyState,Ip, NameSpace ),
          {noreply, MyState};
          
@@ -479,20 +440,13 @@ change_status(Ip, NameSpace, Status) ->
     
    
 check_expired_sessions( Application )->
-
-    NameSpaces = 
-        case application:get_env(Application, queue) of
-                {ok, List}-> List;
-                _ ->[]
-        end,
     
     case  application:get_env(Application, live_time_session) of
       {ok, ExpiredMiliSeconds} ->
             Fun  =  fun one_expired/5,
             NewKey = ets:first(?ERWS_API),
             Now = now(),
-            check_expired_key(NewKey, Fun, ?ERWS_API, ExpiredMiliSeconds, Now),
-            lists:foreach(fun clean_not_actual/1, NameSpaces);
+            check_expired_key(NewKey, Fun, ?ERWS_API, ExpiredMiliSeconds, Now);
        _->
         do_nothing
     end
@@ -511,24 +465,7 @@ one_expired(Body  = #api_record{id = Session,aim_pid =  Pid, start_time = StartT
                                     end
 .
 
-clean_not_actual(NameSpace)->
-    Key  = ets:first(NameSpace),    
-    clean_not_actual(Key, NameSpace )
-.
-clean_not_actual('$end_of_table', _AtomNS) ->
-    true;
-clean_not_actual(Key, AtomNS) ->
-    Req = ets:lookup(?ERWS_API, Key),
-    case  Req of
-        [] -> 
-            ets:delete(AtomNS, Key),
-            clean_not_actual(ets:first(AtomNS), AtomNS);
-        _->
-            clean_not_actual(ets:next(AtomNS, Key), AtomNS)
-    end
-.
 
-  
 
 check_expired_key('$end_of_table', _Fun,  _Table, _E, _ )->
     finish;

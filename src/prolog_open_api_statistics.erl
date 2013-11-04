@@ -27,14 +27,23 @@ get_system_state() ->
     JsonData = to_json_format(<<"state">>, List),
     {ok, {length(List), JsonData}}.
 
-get_requests(AtomNS) ->
-    ReqList = make_requests(AtomNS),
+get_requests(NS) ->
+    ReqList = make_requests(NS),
     JsonReqs = to_json_format(<<"request">>, ReqList),
     {ok, {length(ReqList), JsonReqs}}.
 
-make_requests(AtomNS) ->
-    make_requests(ets:tab2list(AtomNS), []).
-
+make_requests(NS) ->
+    List = ets:tab2list(?ERWS_API),
+    Queue = lists:filter(fun(E)->
+                             case E of 
+                                 #api_record{namespace = NS} ->
+                                    true;
+                                _ ->false                        
+                             end
+                        end, List ),
+    make_requests(Queue, []).
+    
+    
 make_requests([], Acc) ->
     Acc;
 make_requests([{Session}|T], Acc) ->

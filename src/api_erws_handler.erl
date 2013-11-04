@@ -28,7 +28,6 @@ handle(Req, State) ->
 
 start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
     Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
-    insert_req(NameSpace, Session),    
     ets:insert(?ERWS_API, #api_record{id = Session, 
                                       aim_pid = Pid,
                                       result = wait,
@@ -286,9 +285,8 @@ aim_next(Session) ->
 
 delete_session(Session) ->
     case ets:lookup(?ERWS_API, Session) of
-	    [  #api_record{aim_pid = Pid, namespace = AtomNS}] ->
+	    [  #api_record{aim_pid = Pid}] ->
 	        ets:delete(?ERWS_API, Session),
-                delete_req(AtomNS, Session),  
 	        Pid ! {some_code, finish} ,
 	        true;
 	    []->
@@ -575,38 +573,7 @@ generate_session()->
     Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[MSecs, Secs, MiSecs])), %reference has only 14 symbols
     Res.
 
-%% Check Reqs
+%% TODO
 reload(NameSpace) ->
-    case proplists:get_value(size, ets:info(list_to_atom(?QUEUE_PREFIX ++ NameSpace))) of
-        0 ->
-            prolog:delete_inner_structs(NameSpace),
-            fact_hbase:load_rules2ets(NameSpace), 
-            <<"true">>;
-        _ ->
-%             spawn(fun() -> start_aside_reload(NameSpace) end),
-            <<"set_aside">>
-            
-    end.   
+    todo.   
     
-
-    
-%% Delete/ Insert Reqs
-insert_req(NameSpace, SessionId) ->
-   AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
-   case catch ets:insert(AtomNS, {SessionId}) of
-        true->
-            ?API_LOG("~p session id has inserted to queue ~p",[{?MODULE,?LINE},  SessionId ]);
-        Exp ->
-            ?API_LOG("~p some exception during inserted to queue ~p",[{?MODULE,?LINE},  Exp ])
-   end.
-
-
-delete_req(NameSpace, SessionId)->
-    AtomNS = list_to_atom(?QUEUE_PREFIX ++ NameSpace),
-    case catch ets:delete(AtomNS, SessionId) of
-        true-> do_nothing;
-        Reason ->?API_LOG("~p UNEXPECTED delete from queue ~p",[{?MODULE,?LINE}, {AtomNS, SessionId, Reason}])
-    end.
-
-
-
