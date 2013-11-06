@@ -387,7 +387,7 @@ store_result(Session ,R) ->
                     BackPid ! {result, R},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
-                    ?API_LOG("~p process callback   ~p",[{?MODULE,?LINE}, ApiRecord]),
+                    ?WEB_REQS("~p process callback   ~p",[{?MODULE,?LINE}, ApiRecord]),
                     case ApiRecord#api_record.request_type  of
                         call ->
                             ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
@@ -441,13 +441,13 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                                       {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     Res ->
-                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            ?WEB_REQS("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
                             exit(normal)                      
                 end
 
@@ -469,13 +469,13 @@ api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
                                       {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     Res ->
-                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            ?WEB_REQS("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
                             exit(normal)                        
                 end
 
@@ -498,13 +498,13 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                                       {timeout, ?HTTP_TIMEOUT }],
                                     [ {sync, true},{ body_format, binary } ] ) of
                     { ok, { {_NewVersion, 200, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     { ok, { {_NewVersion, 204, _NewReasonPhrase}, _NewHeaders, Text1 } } ->
-                            ?API_LOG("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
+                            ?WEB_REQS("~p callback is finished  ~p",[{?MODULE,?LINE}, Text1]),
                             exit(normal);
                     Res ->
-                            ?API_LOG("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
+                            ?WEB_REQS("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
                             exit(normal)                        
                 end
 
