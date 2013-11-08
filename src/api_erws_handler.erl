@@ -142,11 +142,12 @@ get_result(Session, _NameSpace)->
                 delete_session(Session),
 		exit(Pid, finish),
 		unexpected_error;	
-	[ #api_record{result = SomeThing, prototype = ProtoType }] ->
+	[ #api_record{result = Result, prototype = ProtoType }] ->
             
 %                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
+                 [_| Params]     = tuple_to_list(Result),
 	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType}]),
-	        VarsRes = lists:map(fun api_var_match/1, SomeThing ),
+	        VarsRes = lists:map(fun api_var_match/1, Params ),
 		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
 
