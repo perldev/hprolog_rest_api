@@ -52,10 +52,11 @@ start_once_aim(Msg, NameSpace, undefined, BackPid)->
             {result, false } ->
                       jsx:encode( [ {status, false} ]);
             {result, SomeThing} ->
-                     {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
-                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg, NewLocalContext}]),
-                     VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
-                     jsx:encode( [ {status, true}, {result, VarsRes}] )
+%                      {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
+                     [_Arg|Params]  = tuple_to_list(SomeThing),
+                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
+                     VarsRes = lists:map(fun api_var_match/1, Params ),
+                     jsx:encode( [ {status, true}, {result, VarsRes} ] )
             after ?FATAL_TIME_ONCE ->
                     exit(Pid, timeout),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
@@ -141,10 +142,11 @@ get_result(Session, _NameSpace)->
                 delete_session(Session),
 		exit(Pid, finish),
 		unexpected_error;	
-	[ #api_record{result =  SomeThing, prototype=ProtoType }] ->
-                {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
-	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType, NewLocalContext}]),
-	        VarsRes = lists:map(fun api_var_match/1, dict:to_list(NewLocalContext)),
+	[ #api_record{result = SomeThing, prototype = ProtoType }] ->
+            
+%                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
+	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType}]),
+	        VarsRes = lists:map(fun api_var_match/1, SomeThing ),
 		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
 
@@ -450,7 +452,8 @@ get_auth_salt(Post, SaltL )->
     
 api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->    
                 [_| Params]     = tuple_to_list(ProtoType),
-                VarsRes = lists:map( fun api_callback_process_params/1, Params ),
+                
+                VarsRes = lists:map( fun api_var_match/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
