@@ -83,26 +83,51 @@ start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
     process_req(NewSession, Msg),
     jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
 
-api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
-    {Key, list_to_binary( io_lib:format("~p",[Val]))};
+% lists:map(fun api_var_match/1, dict:to_list(NewLocalContext))    
+
+api_var_match( Val ) when is_tuple(Val) ->
+          list_to_binary( io_lib:format("~p",[Val]));
 api_var_match({{ Key }, Val} ) when is_float(Val)->
-    {Key , list_to_binary( float_to_list(Val))};
+          Val;
+api_var_match( Val ) when is_integer(Val)->
+          Val; 
+api_var_match( Val ) when is_list(Val) -> 
+        case catch( unicode:characters_to_binary(Val)) of
+                {'EXIT', _ }->
+                        lists:map( fun api_var_match/1, Val )  ;
+                SomeThing ->
+                        SomeThing
+        end;                
+api_var_match( [])->
+     <<"">>;
+%%%%TODO avoid this
+api_var_match( Val ) when is_atom(Val)-> 
+   [ {<<"atom">>, list_to_binary( atom_to_list(Val))}];
+
+api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
+    [{Key, list_to_binary( io_lib:format("~p",[Val]))}];
+api_var_match({{ Key }, Val} ) when is_float(Val)->
+    [{Key , Val }];
 api_var_match({{ Key }, Val} ) when is_integer(Val)->
-	{Key , list_to_binary( integer_to_list(Val) )}; 
+    [{Key , Val}]; 
+	
 api_var_match({{ Key }, Val} ) when is_list(Val) -> 
 	case catch( unicode:characters_to_binary(Val)) of
 		{'EXIT', _ }->
-		    {Key,  list_to_binary( io_lib:format("~p",[Val]))};
+		    [{Key, lists:map( fun api_var_match/1, Val )  }];
 		SomeThing ->
-			{Key, SomeThing}
+			[{Key, SomeThing}]
 	end;		    
 api_var_match({ { Key }, []})->
-    {Key, <<"">>};
+   [{Key, <<"">>}];
+%%%%TODO avoid this
 api_var_match({ { Key }, Val}) when is_atom(Val)-> 
-   {Key, [ {<<"atom">>, list_to_binary( atom_to_list(Val))}]};
-api_var_match({ { Key }, Val}) -> 
-   {Key, Val}.
-
+   [{Key, [ {<<"atom">>, list_to_binary( atom_to_list(Val))}]}];
+api_var_match({ { Key }, Val }) -> 
+   [{ Key, list_to_binary(io_lib:format("~p",[Val]) )}];
+api_var_match( Val ) -> 
+    Val.
+    
 get_result(Session, _NameSpace)->
     case ets:lookup(?ERWS_API, Session) of 
 	[]-> session_finished;
@@ -507,8 +532,6 @@ api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
                             ?WEB_REQS("~p callback is unexpected  ~p",[{?MODULE,?LINE}, Res]),
                             exit(normal)                        
                 end
-
-
 .
 
     
