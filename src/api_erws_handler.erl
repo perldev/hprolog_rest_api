@@ -146,7 +146,7 @@ get_result(Session, _NameSpace)->
             
 %                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
                  [_| Params]     = tuple_to_list(Result),
-	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  ProtoType}]),
+	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {Result,  ProtoType}]),
 	        VarsRes = lists:map(fun api_var_match/1, Params ),
 		jsx:encode( [ {status, true}, {result, VarsRes}])
     end.
