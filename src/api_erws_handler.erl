@@ -5,7 +5,7 @@
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
 
--export([start_new_aim/3,api_callback/5, start_link_session/6, start_shell_process/2, result/1, api_var_match/1,get_result/2,generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
+-export([start_new_aim/3, api_callback/5, start_link_session/6, start_shell_process/2, result/1, api_var_match/1, get_result/2, generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
@@ -86,6 +86,13 @@ start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
 
 % lists:map(fun api_var_match/1, dict:to_list(NewLocalContext))    
 
+is_flatten([])->
+    false;
+is_flatten([Head|List]) when is_list(Head)->
+    true;
+is_flatten([_Head|List])->
+    is_flatten(List).
+    
 api_var_match( Val ) when is_tuple(Val) ->
           list_to_binary( io_lib:format("~p",[Val]));
 api_var_match({{ Key }, Val} ) when is_float(Val)->
@@ -93,11 +100,11 @@ api_var_match({{ Key }, Val} ) when is_float(Val)->
 api_var_match( Val ) when is_integer(Val)->
           Val; 
 api_var_match( Val ) when is_list(Val) -> 
-        case catch( unicode:characters_to_binary(Val)) of
-                {'EXIT', _ }->
-                        lists:map( fun api_var_match/1, Val )  ;
-                SomeThing ->
-                        SomeThing
+        case is_flatten(Val) of
+                true ->
+                        lists:map( fun api_var_match/1, Val ) ;
+                _ ->
+                        unicode:characters_to_binary(Val)
         end;                
 api_var_match( [])->
      <<"">>;
@@ -113,12 +120,12 @@ api_var_match({{ Key }, Val} ) when is_integer(Val)->
     [{Key , Val}]; 
 	
 api_var_match({{ Key }, Val} ) when is_list(Val) -> 
-	case catch( unicode:characters_to_binary(Val)) of
-		{'EXIT', _ }->
-		    [{Key, lists:map( fun api_var_match/1, Val )  }];
-		SomeThing ->
-			[{Key, SomeThing}]
-	end;		    
+	 case is_flatten(Val) of
+                true ->
+                        lists:map( fun api_var_match/1, Val ) ;
+                _ ->
+                        unicode:characters_to_binary(Val)
+         end;  	    
 api_var_match({ { Key }, []})->
    [{Key, <<"">>}];
 %%%%TODO avoid this
