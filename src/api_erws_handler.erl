@@ -23,7 +23,9 @@ handle(Req, State) ->
      Result = api_handle(Path, Req1, State),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-     {ok, NewReq, State}.
+     
+      Req2 = cowboy_req:set_resp_header(<<"access-control-allow-origin">>, <<"*">>, NewReq),
+     {ok, Req2, State}.
     
 
 start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
@@ -422,7 +424,7 @@ store_result(Session ,R) ->
                     BackPid ! {result, R},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
-                    ?WEB_REQS("~p process callback   ~p",[{?MODULE,?LINE}, ApiRecord]),
+                    ?WEB_REQS("~p process callback   ~p ~n result ~p~n",[{?MODULE,?LINE}, ApiRecord, R]),
                     case ApiRecord#api_record.request_type  of
                         call ->
                             ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
