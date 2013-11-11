@@ -23,8 +23,7 @@ handle(Req, State) ->
      Result = api_handle(Path, Req1, State),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-     
-      Req2 = cowboy_req:set_resp_header(<<"access-control-allow-origin">>, <<"*">>, NewReq),
+      Req2 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, NewReq),
      {ok, Req2, State}.
     
 
