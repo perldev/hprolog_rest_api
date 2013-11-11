@@ -23,8 +23,11 @@ handle(Req, State) ->
      Result = api_handle(Path, Req1, State),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-      Req2 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, NewReq),
-     {ok, Req2, State}.
+     Req2 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, NewReq),
+     Req1 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Methods">>, <<"GET, POST">>, Req2),
+     ResReq = cowboy_req:set_resp_header(<<"Access-Control-Allow-Headers">>, <<"Content-Type, *">>, Req1),
+
+     {ok, ResReq, State}.
     
 
 start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
