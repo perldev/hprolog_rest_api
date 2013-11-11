@@ -21,11 +21,15 @@ handle(Req, State) ->
      {Path, Req1} = cowboy_req:path_info(Req),
      ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
-     ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
+%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
      Req2 = cowboy_req:set_resp_header(<<"access-control-allow-origin">>, <<"*">>, NewReq),
-     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, <<"GET, POST">>, Req2),
-     ResReq = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, <<"Content-Type, *">>, Req1),
+%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Req2]),
+     Req_ = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, <<"GET, POST">>, Req2),
+%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Req_]),
+
+     ResReq = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, <<"Content-Type, *">>, Req_),
+%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, ResReq]),
 
      {ok, ResReq, State}.
     
