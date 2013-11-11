@@ -17,21 +17,26 @@ init({tcp, http}, Req, _Opts) ->
 terminate(_Req, _State, _T) ->
     ok.
 
+json_headers()->
+
+    [
+    {<<"access-control-allow-origin">>, <<"*">>},
+    {<<"access-control-allow-methods">>, <<"GET, POST">>},
+    {<<"access-control-allow-headers">>, <<"Content-Type, *">>},
+    {<<"Content-Type">>, <<"application/json">>}
+    ]
+
+
+.    
+    
 handle(Req, State) ->
      {Path, Req1} = cowboy_req:path_info(Req),
      ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
-%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-     Req2 = cowboy_req:set_resp_header(<<"access-control-allow-origin">>, <<"*">>, NewReq),
-%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Req2]),
-     Req_ = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, <<"GET, POST">>, Req2),
-%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Req_]),
-
-     ResReq = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, <<"Content-Type, *">>, Req_),
-%      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, ResReq]),
-
-     {ok, ResReq, State}.
+     
+     
+     {ok, NewReq, State}.
     
 
 start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
@@ -168,39 +173,39 @@ get_result(Session, _NameSpace)->
 
 generate_http_resp(system_off, Req) ->
     Response  = jsx:encode([{status,<<"fail">>},{description, <<"system_off">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(try_again, Req) ->
     Response  = jsx:encode([{status,<<"try_again">>},{description, <<"reload namespace">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(session_finished, Req) ->
     Response  = jsx:encode([{status,<<"fail">>},{ description, <<"session finished">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(result_not_ready, Req)->
     Response  = jsx:encode([{status,<<"wait">>},{ description, <<"result not ready">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(false, Req)->
     Response  = jsx:encode([{status,<<"false">>},{ description, <<"aim was not reached">>}]),
     ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(unexpected_error, Req)->
     Response  = jsx:encode([{status,<<"fail">>},{ description, <<"we have got unexpected error">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);
+    cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(aim_in_process, Req)->
     Response  = jsx:encode([{status,<<"wait">>},{ description, <<"this aim in process">> } ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
+    cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(permissions_denied, Req)->
     Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
+    cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(not_found, Req)->
     Response  = jsx:encode([{status,<<"fail">>},{ description, <<"not found">>}]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);		
+    cowboy_req:reply(200, json_headers(), Response, Req);		
 generate_http_resp(true, Req)->
     Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">>}]),
     ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Response, Req);	
+    cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(Json, Req)->
     ?LOG_INFO("~p response ~p~n",[?LINE, Json ]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Json, Req).
+    cowboy_req:reply(200, [], Json, Req).
 
 % api_handle_command([<<"reload">>, BinNameS], Req) ->
 %     ?LOG_INFO("Reload: ~p~n", [Req]),
@@ -216,7 +221,7 @@ generate_http_resp(Json, Req)->
 %             <<"fail">>
 %     end,
 %     Resp = jsx:encode([{status,Res}, {description, <<"reload namespace">>}]),
-%     cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}], Resp, Req);
+%     cowboy_req:reply(200, json_headers(), Resp, Req);
 
 % sync request
 api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params}) ->  %%TODO
@@ -226,7 +231,7 @@ api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params}) ->  %
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response =  start_once_aim(Msg, NameSpace, CallBack, self()),
     ?LOG_INFO("~n send to client ~p",[Response]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
+    cowboy_req:reply(200, json_headers(),
         Response, Req3);
 
 api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params}) ->  %%TODO
@@ -236,7 +241,7 @@ api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params}) ->
     ?WEB_REQS("~n generate aim ~p",[Msg]),
     Response = start_new_aim(Msg, NameSpace, CallBack),
     ?LOG_INFO("~n send to client ~p",[Response]),
-    cowboy_req:reply(200, [{<<"Content-Type">>, <<"application/json">>}],
+    cowboy_req:reply(200, json_headers(),
 	Response, Req3);
 api_handle_command([<<"process">>, NameSpace, Session], Req, _Params) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
