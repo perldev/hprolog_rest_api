@@ -23,9 +23,9 @@ handle(Req, State) ->
      Result = api_handle(Path, Req1, State),
      ?LOG_DEBUG("Line: ~p Got: ~p~n", [?LINE, Result]),
      {ok, NewReq} = Result,
-     Req2 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Origin">>, <<"*">>, NewReq),
-     Req1 = cowboy_req:set_resp_header(<<"Access-Control-Allow-Methods">>, <<"GET, POST">>, Req2),
-     ResReq = cowboy_req:set_resp_header(<<"Access-Control-Allow-Headers">>, <<"Content-Type, *">>, Req1),
+     Req2 = cowboy_req:set_resp_header(<<"access-control-allow-origin">>, <<"*">>, NewReq),
+     Req1 = cowboy_req:set_resp_header(<<"access-control-allow-methods">>, <<"GET, POST">>, Req2),
+     ResReq = cowboy_req:set_resp_header(<<"access-control-allow-headers">>, <<"Content-Type, *">>, Req1),
 
      {ok, ResReq, State}.
     
