@@ -22,6 +22,7 @@
 -define(WORK_PORT,8313).
 -define(COUNT_LISTENERS,10).
 -define(API_SALT, salt).
+-define(API_SL_TIMEOUT, api_timeout_sl).
 
 -define(FATAL_TIME_ONCE, 600000).%% TODO add to config 
 -define(ERWS_API, api_table).

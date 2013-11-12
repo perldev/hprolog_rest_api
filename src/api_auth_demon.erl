@@ -20,7 +20,10 @@
             get_namespace_config/1,
             get_name_space_info/1,
             get_source/1,
-            hexstring/1]
+            hexstring/1,
+            get_dict_default/3,
+            get_dict_default/2
+            ]
        ).
 
 
@@ -44,8 +47,8 @@ start_link(Application) ->
 
 %%TODO name spaces
 init([Application]) ->
-	ets:new(system_state, [named_table, public]),
-	ets:insert(system_state, {prolog_api, on}),  
+	ets:new(system_state, [named_table, public] ),
+	ets:insert(system_state, {prolog_api, on} ),  
 
         timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
         
@@ -199,16 +202,19 @@ get_name_space_info(Id)->
 get_api_salt(Id)->
     case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
        [{Id, _Name, Config}]->
-                case dict:find(?API_SALT, Config) of
-                    error -> undefined;
-                    {ok, Value}-> Value
-                end;
-    
+                get_dict_default(?API_SALT, Config, undefined);    
        []->
                 undefined
     end
 .
 
+get_dict_default(Key, Dict)->
+    get_dict_default(Key, Dict, undefined).  
+get_dict_default(Key, Dict, Default)->
+                case dict:find(Key, Dict) of
+                    error -> Default;
+                    {ok, Value}-> Value
+                end.
 
 
        
@@ -263,29 +269,23 @@ handle_cast({load_auth_info, Application }, State)->
                _ ->
                     ets:insert(api_auth_info, [])
         end,
-        ets:foldl(fun({NameSpaceName, _Time}, In) ->  
-                 ?LOG_DEBUG("load namespace ~p ~n",[NameSpaceName]),
-                  case ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpaceName)  of
-                                [{_, _, Config  } ]->
-                                                             case dict:find(source, Config) of
-                                                                    {ok, {file, Path} }->
-                                                                         ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
-                                                                         ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
-                                                                         ResCreateTab = (catch ets:file2tab(Path)),
-                                                                         ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
-                                                                    {ok, hbase}->
-                                                                        ?LOG_DEBUG("load namespace from hbase  ~n",[]),
-                                                                         spawn(prolog_shell, api_start, [NameSpaceName] );
-                                                                    _ ->
-                                                                        throw({'non_exist_the_source', NameSpaceName, Config})
-                                                            end,   
-                                                            ets:insert(NameSpace, {NameSpaceName, now()}),
-                                                            [NameSpaceName|In];
-                                 _->
-                                                   ?LOG_DEBUG("load namespace has failed ~p ~n",[NameSpaceName]),
-                                                   In                                                 
-                            end
-                    end,[], NameSpace),
+       Loaded =  ets:foldl(fun({ NameSpaceName, _, Config  }, In) ->  
+                        case dict:find(source, Config) of
+                                    {ok, {file, Path} }->
+                                            ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
+                                            ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
+                                            ResCreateTab = (catch ets:file2tab(Path)),
+                                            ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
+                                    {ok, hbase}->
+                                            ?LOG_DEBUG("load namespace from hbase  ~n",[]),
+                                            spawn(prolog_shell, api_start, [NameSpaceName] );
+                                    _ ->
+                                             throw({'non_exist_the_source', NameSpaceName, Config})
+                        end,   
+                        ets:insert(NameSpace, {NameSpaceName, now()}),
+                        [NameSpaceName|In]
+                    end,[], ?ETS_PUBLIC_SYSTEMS),
+       ?LOG_DEBUG("~p list of load namespaces  ~p ~n",[{?MODULE,?LINE}, Loaded ]),
         {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
         {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
         {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),

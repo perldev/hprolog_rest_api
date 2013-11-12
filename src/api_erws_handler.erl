@@ -33,9 +33,7 @@ handle(Req, State) ->
      {Path, Req1} = cowboy_req:path_info(Req),
      ?LOG_DEBUG("Request: ~p~n", [Path]),
      Result = api_handle(Path, Req1, State),
-     {ok, NewReq} = Result,
-     
-     
+     {ok, NewReq} = Result,     
      {ok, NewReq, State}.
     
 
@@ -52,15 +50,16 @@ start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
                                       request_type = Type}),       
     Pid.
 
-start_once_aim({error, Description}, _NameSpace,_,_)->
+start_once_aim({error, Description}, _NameSpace,_,_, _ConfigNameSpace)->
     Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
-start_once_aim(error, _NameSpace, _,_)->
+start_once_aim(error, _NameSpace, _,_, _ConfigNameSpace)->
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]);
-start_once_aim(Msg, NameSpace, undefined, BackPid)->
+start_once_aim(Msg, NameSpace, undefined, BackPid, ConfigNameSpace)->
         NewSession = erlang:make_ref(),
         Pid = start_link_session(NewSession, Msg, NameSpace, undefined, undefined, {once, BackPid}), 
         process_req(NewSession, Msg),
+        SlTimeOut = api_auth_demon:get_dict_default(?API_SL_TIMEOUT, ConfigNameSpace, ?FATAL_TIME_ONCE), 
         receive 
             {result, false } ->
                       jsx:encode( [ {status, false} ]);
@@ -70,11 +69,11 @@ start_once_aim(Msg, NameSpace, undefined, BackPid)->
                      ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
                      VarsRes = lists:map(fun api_var_match/1, Params ),
                      jsx:encode( [ {status, true}, {result, VarsRes} ] )
-            after ?FATAL_TIME_ONCE ->
+            after SlTimeOut ->
                     exit(Pid, timeout),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
         end;
-start_once_aim(Msg, NameSpace, CallBackUrl, _BackPid)->
+start_once_aim(Msg, NameSpace, CallBackUrl, _BackPid, _ConfigNameSpace)->
         NewSession = generate_session(),
         Salt =  api_auth_demon:get_api_salt(NameSpace),
         start_link_session(NewSession, Msg, NameSpace, CallBackUrl, Salt, once), 
@@ -207,34 +206,19 @@ generate_http_resp(Json, Req)->
     ?LOG_INFO("~p response ~p~n",[?LINE, Json ]),
     cowboy_req:reply(200, json_headers(), Json, Req).
 
-% api_handle_command([<<"reload">>, BinNameS], Req) ->
-%     ?LOG_INFO("Reload: ~p~n", [Req]),
-%     NameSpace = binary_to_list(BinNameS),
-%     Res = case fact_hbase:check_exist_table(NameSpace ++ ?META_FACTS) of
-%         false ->
-%             io:format("res check exist_table: ~p~n", [false]), 
-%             <<"fail">>;
-%         true ->
-%             io:format("res check exist_table: ~p~n", [true]),
-%             reload(NameSpace);
-%         _ -> 
-%             <<"fail">>
-%     end,
-%     Resp = jsx:encode([{status,Res}, {description, <<"reload namespace">>}]),
-%     cowboy_req:reply(200, json_headers(), Resp, Req);
 
 % sync request
-api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params}) ->  %%TODO
+api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params, ConfigNameSpace}) ->  %%TODO
     ?API_LOG("~n New client ~p",[{Req3, PostVals}]),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
     Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response =  start_once_aim(Msg, NameSpace, CallBack, self()),
+    Response =  start_once_aim(Msg, NameSpace, CallBack, self(), ConfigNameSpace),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, json_headers(),
         Response, Req3);
 
-api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params}) ->  %%TODO
+api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params, _ConfigNameSpace}) ->  %%TODO
     ?API_LOG("~n New client ~p",[{Req3, PostVals}]),
     CallBack = proplists:get_value(<<"callback">>, PostVals),
     Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim))),    
@@ -302,7 +286,7 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
                         false -> 
                             generate_http_resp(permissions_denied, Req1);
                         true  -> 
-                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1, {PostVals, Params } );
+                            api_handle_command([ Cmd, NameSpace, SomeThing ], Req1, {PostVals, Params, ConfigNameSpace } );
                         try_again ->                    
                             generate_http_resp(try_again, Req1);
                         system_off ->
@@ -618,7 +602,10 @@ generate_session()->
     % im do not want to rewrite it 
     Res = lists:flatten( io_lib:format("~.36B~.36Be~.36Be",[MSecs, Secs, MiSecs])), %reference has only 14 symbols
     Res.
+    
 
+    
+    
 %% TODO
 reload(NameSpace) ->
     todo.   
