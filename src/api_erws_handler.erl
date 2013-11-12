@@ -205,7 +205,7 @@ generate_http_resp(true, Req)->
     cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(Json, Req)->
     ?LOG_INFO("~p response ~p~n",[?LINE, Json ]),
-    cowboy_req:reply(200, [], Json, Req).
+    cowboy_req:reply(200, json_headers(), Json, Req).
 
 % api_handle_command([<<"reload">>, BinNameS], Req) ->
 %     ?LOG_INFO("Reload: ~p~n", [Req]),
@@ -357,7 +357,6 @@ start_shell_process(Session, NameSpace)->
     IsHbase = api_auth_demon:get_source(NameSpace),
     ets:insert(NewTree, {system_record, hbase, IsHbase}),
     ets:insert(NewTree, {system_record, ?PREFIX, NameSpace}),
-
     shell_loop(start, NewTree, Session).
 
       
