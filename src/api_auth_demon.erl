@@ -22,7 +22,8 @@
             get_source/1,
             hexstring/1,
             get_dict_default/3,
-            get_dict_default/2
+            get_dict_default/2,
+            update_config/3
             ]
        ).
 
@@ -42,6 +43,7 @@
 
 start_link() ->
            gen_server:start_link({local, ?MODULE},?MODULE, [prolog_open_api],[]).
+           
 start_link(Application) ->
 	  gen_server:start_link({local, ?MODULE},?MODULE, [Application],[]).
 
@@ -49,13 +51,9 @@ start_link(Application) ->
 init([Application]) ->
 	ets:new(system_state, [named_table, public] ),
 	ets:insert(system_state, {prolog_api, on} ),  
-
-        timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),
-        
-        
+        timer:apply_after(2000, ?MODULE, load_auth_info, [Application]),       
         Auth = ets:new(api_auth_info, [named_table ,public ,set]),
         ets:new(?ERWS_API,[named_table, public, set, {keypos,2} ]),
-        
         {ok, #monitor {
                         application = Application,
                         auth_info = Auth,
@@ -64,7 +62,6 @@ init([Application]) ->
 
 load_auth_info(Application)->
         gen_server:cast(?MODULE, {load_auth_info, Application }).
-
  
 fill_config4public()->
        NameSpaces =  ets:foldl(fun({PublicKey,_InnerKey, Config}, Acum)-> 
@@ -101,16 +98,14 @@ public_systems(Application)->
 .
 
 get_source(NameSpace)->
-    [{Key, Second, Dict}]= ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpace),
+    [{_Key, _Second, Dict}] = ets:lookup(?ETS_PUBLIC_SYSTEMS, NameSpace),
     case dict:find(source, Dict) of
          {ok, hbase }  ->
             1;
           _->
             0
-    end      
+    end.
     
-.
-
 %%cach auth information
 load_tables(Application)->
 
@@ -202,7 +197,7 @@ get_name_space_info(Id)->
 get_api_salt(Id)->
     case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
        [{Id, _Name, Config}]->
-                get_dict_default(?API_SALT, Config, undefined);    
+                get_dict_default(?API_SALT, Config, undefined);
        []->
                 undefined
     end
@@ -244,8 +239,12 @@ start_namespace(State, NameSpace, Ip)->
 		ets:insert(EtsNameSpace,  {NameSpace, now()}),
 		true;
 	    _-> true
-	end.
+    end.
 
+update_config(NameSpace, Key, Value )->
+        gen_server:cast(?MODULE, {update_config, NameSpace, Key, Value})
+.
+    
 low_stop_auth(State,  Ip, NameSpace)->
     Ets = State#monitor.registered_ip,
     ets:delete(Ets, {NameSpace, Ip}).
@@ -272,13 +271,13 @@ handle_cast({load_auth_info, Application }, State)->
        Loaded =  ets:foldl(fun({ NameSpaceName, _, Config  }, In) ->  
                         case dict:find(source, Config) of
                                     {ok, {file, Path} }->
-                                            ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
-                                            ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
-                                            ResCreateTab = (catch ets:file2tab(Path)),
-                                            ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
+                                             ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
+                                             ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
+                                             ResCreateTab = (catch ets:file2tab(Path)),
+                                             ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
                                     {ok, hbase}->
-                                            ?LOG_DEBUG("load namespace from hbase  ~n",[]),
-                                            spawn(prolog_shell, api_start, [NameSpaceName] );
+                                             ?LOG_DEBUG("load namespace from hbase  ~n",[]),
+                                             spawn(prolog_shell, api_start, [NameSpaceName] );
                                     _ ->
                                              throw({'non_exist_the_source', NameSpaceName, Config})
                         end,   
@@ -298,7 +297,17 @@ handle_cast({load_auth_info, Application }, State)->
                   registered_ip = Registered
 
 }};
-
+handle_cast({update_config, IdNameSpace, Key, Value}, State)->
+    case ets:lookup(?ETS_PUBLIC_SYSTEMS, IdNameSpace) of
+        []->    
+            ?LOG_DEBUG("uexpected error for saving params in  ~p ~n", [IdNameSpace]);
+        [{IdNameSpace, LForeign, Config} ]->
+              NewConfig = dict:store(Key, Value, Config),
+              ets:insert(?ETS_PUBLIC_SYSTEMS, { IdNameSpace, LForeign, NewConfig }),
+              ?LOG_DEBUG("saving expert system result ~p ~n", [ IdNameSpace ])
+    end, 
+   {noreply, State}
+;
 handle_cast({save_public_system, Id, LForeign, EtsTable}, State)->
     case ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
         []->    
@@ -418,11 +427,10 @@ compare_req_salt(<<"create">>, Params, _Path, AuthInfo, ApiSalt )->
             AuthInfo  =:= list_to_binary( hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) 
 ;
 compare_req_salt(_,_Post, UrlPath, AuthInfo, ApiSalt)->
-
             Salt = list_to_binary(ApiSalt),
             AuthInfo  =:= list_to_binary( hexstring( crypto:hash(sha512, <<UrlPath/binary, Salt/binary>>) ) ) 
-
 .
+
 hexstring(<<X:128/big-unsigned-integer>>) ->
     lists:flatten(io_lib:format("~32.16.0b", [X]));
 hexstring(<<X:160/big-unsigned-integer>>) ->
