@@ -23,7 +23,8 @@
             hexstring/1,
             get_dict_default/3,
             get_dict_default/2,
-            update_config/3
+            update_config/3,
+            delete_config/2
             ]
        ).
 
@@ -244,6 +245,11 @@ start_namespace(State, NameSpace, Ip)->
 update_config(NameSpace, Key, Value )->
         gen_server:cast(?MODULE, {update_config, NameSpace, Key, Value})
 .
+
+delete_config(NameSpace, Key)->
+        gen_server:cast(?MODULE, {delete_config, NameSpace, Key })
+.
+      
     
 low_stop_auth(State,  Ip, NameSpace)->
     Ets = State#monitor.registered_ip,
@@ -297,6 +303,18 @@ handle_cast({load_auth_info, Application }, State)->
                   registered_ip = Registered
 
 }};
+
+handle_cast({delete_config, IdNameSpace, Key}, State)->
+    case ets:lookup(?ETS_PUBLIC_SYSTEMS, IdNameSpace) of
+        []->    
+            ?LOG_DEBUG("uexpected error for saving params in  ~p ~n", [IdNameSpace]);
+        [ {IdNameSpace, LForeign, Config} ]->
+              NewConfig = dict:erase(Key, Config),
+              ets:insert(?ETS_PUBLIC_SYSTEMS, { IdNameSpace, LForeign, NewConfig }),
+              ?LOG_DEBUG("saving expert system result ~p ~n", [ IdNameSpace ])
+    end, 
+   {noreply, State}
+;
 handle_cast({update_config, IdNameSpace, Key, Value}, State)->
     case ets:lookup(?ETS_PUBLIC_SYSTEMS, IdNameSpace) of
         []->    
