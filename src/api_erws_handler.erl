@@ -13,20 +13,19 @@
 % Called to know how to dispatch a new connection.
 init({tcp, http}, Req, _Opts) ->
     {ok, Req, undefined}.
+
+    
     
 terminate(_Req, _State, _T) ->
     ok.
 
 json_headers()->
-
     [
     {<<"access-control-allow-origin">>, <<"*">>},
     {<<"access-control-allow-methods">>, <<"GET, POST">>},
     {<<"access-control-allow-headers">>, <<"Content-Type, *">>},
     {<<"Content-Type">>, <<"application/json">>}
     ]
-
-
 .    
     
 handle(Req, State) ->
@@ -461,7 +460,6 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-                
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}

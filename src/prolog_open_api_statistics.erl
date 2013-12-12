@@ -2,7 +2,6 @@
 %% Statistics
 -export([   get_graph_data/1, 
 	    get_requests/1, 
-	    get_namespaces/0, 
 	    get_code_memory/1, 
 	    get_system_state/0,
             get_processes/0,
@@ -49,9 +48,7 @@ make_requests([], Acc) ->
 make_requests([{Session}|T], Acc) ->
     Req = ets:lookup(?ERWS_API, Session),
     make_requests(T, [Req|Acc]).
-    
-get_namespaces() ->
-   {ok, [list_to_binary(X) || X  <- fact_hbase:get_list_namespaces()]}.
+
 
 get_processes() ->
     {ok, erlang:system_info(process_count)}.

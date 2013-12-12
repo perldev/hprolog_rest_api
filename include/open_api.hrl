@@ -31,12 +31,15 @@
 -define(HTTP_TIMEOUT, 10000).
 -define(ETS_PUBLIC_SYSTEMS_BACKUP, ets_public_system_backup ).
 -define(ETS_PUBLIC_SYSTEMS, public_ids).
+-define(ETS_REG_USERS, regis_users).
+
 %%% TODO move to config
 %-define(ETS_PUBLIC_SYSTEMS_DETS, "./public_ids.dets").
 %-define(REGISTERED_FILE, "./registered.ets" ).
 %-define(REGISTERED_NAMESPACE, "./namespaces.ets" ).
 %-define(CACHE_CONNECTION, 10000 ).%miliseconds
 
+-define(AUTH_SESSION, google_inner_session).  %%connect google and inner session
 -define(QUEUE_PREFIX,"queue").
 
 

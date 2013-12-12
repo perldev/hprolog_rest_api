@@ -24,7 +24,8 @@
             get_dict_default/3,
             get_dict_default/2,
             update_config/3,
-            delete_config/2
+            delete_config/2,
+            get_namespaces/1
             ]
        ).
 
@@ -85,7 +86,10 @@ fill_config4public()->
         ?LOG_DEBUG("Namespaces ~p are being published  ~n",[NameSpaces])
 .
 
+get_namespaces(UserId)->
+        ets:tab2list(?ETS_PUBLIC_SYSTEMS)
 
+.
 
 public_systems(Application)->
         {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
@@ -274,7 +278,7 @@ handle_cast({load_auth_info, Application }, State)->
                _ ->
                     ets:insert(api_auth_info, [])
         end,
-       Loaded =  ets:foldl(fun({ NameSpaceName, _, Config  }, In) ->  
+        Loaded =  ets:foldl(fun({ NameSpaceName, _, Config  }, In) ->  
                         case dict:find(source, Config) of
                                     {ok, {file, Path} }->
                                              ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
