@@ -25,28 +25,8 @@ init({tcp, http}, _Req, _Opts) ->
 
 websocket_init(_Any, Req, []) ->
 %     {ok, Req, undefined, hibernate}.
-      {ok, Req, undefined}.
+      {ok, Req, #socket_state{}}.
 
-websocket_handle({text, JSONRequest}, Req, undefined) ->
-    Request = jsx:decode(JSONRequest),
-    ?WEB_REQS("req: ~p~n", [Request]),
-    NameSpaceB =  proplists:get_value(<<"namespace">>, Request),
-    Session =  proplists:get_value(<<"token">>, Request),
-    SessKey = binary_to_list(Session),
-    NameSpace = binary_to_list(NameSpaceB),
-    [ { SessKey, UserId }]  = ets:lookup(?AUTH_SESSION, SessKey ),
-    List = ets:lookup(?ETS_REG_USERS, UserId ),      
-    case  lists:keysearch(NameSpace, 4, List) of
-            {value, _Record } -> 
-                JsonErrorResponse = jsx:encode([{<<"status">>, true }|Request]),
-                { reply, {text, JsonErrorResponse}, Req, 
-                   #socket_state{namespace = NameSpace, user_id = UserId, token = Session}
-                };
-            _ ->
-                JsonErrorResponse = jsx:encode([{<<"error">>, <<"request error">>}|Request]),
-                {reply, {text, JsonErrorResponse}, Req, undefined}    
-    end  
-;      
 websocket_handle({text, JSONRequest}, Req, State) ->
     Request = jsx:decode(JSONRequest),
     ?WEB_REQS("req: ~p~n", [Request]),
@@ -107,12 +87,23 @@ system_state(<<"get">>, Req, State ) ->
 code_memory(<<"get">>, Req, State = #socket_state{namespace =  NameSpace }) ->
     {ok, Data} = prolog_open_api_statistics:get_code_memory(NameSpace),
     {to_peer, lists:flatten([{<<"code_memory">>, Data}|Req]), State}.
-
+    
 status(<<"change">>, Req, State ) ->
-    Value = binary_to_list(proplists:get_value(<<"value">>, Req)),
-    true = ets:insert(system_state, {prolog_api, Value}),
-    {to_peer, lists:flatten([{<<"status">>, <<"changed">>}|Req]), State#socket_state{namespace =  Value } }.
-
+    NameSpaceB =  proplists:get_value(<<"namespace">>, Req),
+    Session =  proplists:get_value(<<"token">>, Req),
+    SessKey = binary_to_list(Session),
+    NameSpace = binary_to_list(NameSpaceB),
+    [ { SessKey, UserId }]  = ets:lookup(?AUTH_SESSION, SessKey ),
+    List = ets:lookup(?ETS_REG_USERS, UserId ),      
+    case  lists:keysearch(NameSpace, 4, List) of
+            {value, _Record } -> 
+                     { to_peer, lists:flatten([{<<"status">>, <<"changed">>}|Req]),
+                             State#socket_state{user_id = UserId, 
+                                                token = SessKey,
+                                                namespace =  NameSpace } };
+            _->
+                     { to_peer, lists:flatten([{<<"status">>, <<"error">>}|Req]), State } 
+    end.        
 
 
 
