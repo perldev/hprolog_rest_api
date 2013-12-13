@@ -30,7 +30,6 @@ websocket_init(_Any, Req, []) ->
 websocket_handle({text, JSONRequest}, Req, State) ->
     Request = jsx:decode(JSONRequest),
     ?WEB_REQS("req: ~p~n", [Request]),
-    
     try
         Cmd = proplists:get_value(<<"cmd">>, Request),
         Action = proplists:get_value(<<"action">>, Request),
@@ -46,8 +45,8 @@ websocket_handle({text, JSONRequest}, Req, State) ->
                 {ok, Req, State}
         end
     catch
-        _:_Error ->
-            JsonErrorResponse = jsx:encode([{<<"error">>, <<"request error">>}|Request]),
+        _:Error ->
+            JsonErrorResponse = jsx:encode([{<<"error">>, list_to_binary( io:lib_format("~p", [Error]) ) }|Request]),
             {reply, {text, JsonErrorResponse}, Req, State}
     end.
 

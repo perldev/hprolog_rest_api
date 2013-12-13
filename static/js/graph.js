@@ -18,6 +18,7 @@ var vm_statistic = {
         if(Key != vm_statistic.namespace){
             vm_statistic.ws.send(JSON.stringify({action: "change", cmd: "status", namespace: Key, token: Session }));     
             vm_statistic.namespace = Key;
+            vm_statistic.emptyInstance();
             clearInterval(vm_statistic.timerId);
             $('ul.nav li').removeClass('active');
 
