@@ -46,7 +46,7 @@ websocket_handle({text, JSONRequest}, Req, State) ->
         end
     catch
         _:Error ->
-            JsonErrorResponse = jsx:encode([{<<"error">>, list_to_binary( io:lib_format("~p", [Error]) ) }|Request]),
+            JsonErrorResponse = jsx:encode([{<<"error">>, list_to_binary( io_lib:format("~p", [Error]) ) }|Request]),
             {reply, {text, JsonErrorResponse}, Req, State}
     end.
 
