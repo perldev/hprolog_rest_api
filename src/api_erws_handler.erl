@@ -5,7 +5,12 @@
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
 
--export([start_new_aim/3, api_callback/5, start_link_session/6, start_shell_process/2, result/1, api_var_match/1, get_result/2, generate_http_resp/2, process_req/2, process_json_params/1, proc_object/1, process_params/2]).
+-export([start_new_aim/3, start_once_aim/5, 
+         api_callback/5, start_link_session/6,
+         start_shell_process/2, 
+         result/1, api_var_match/1,
+         get_result/2, generate_http_resp/2, process_req/2, 
+         process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
 -export([init/3, handle/2, terminate/3]).
@@ -356,6 +361,7 @@ shell_loop(start, TreeEts, Back) ->
                     ProcessResult = process_prove(Back, TempAim, Goal, Res, StartTime, TreeEts ),
                     shell_loop(ProcessResult, TreeEts, Back, Goal, TempAim)
 	end.
+	
 shell_loop(finish, _TreeEts, _Back, _Goal, _TempAim) ->
     %%REWRITE it like trace
     exit(normal);
