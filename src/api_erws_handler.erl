@@ -5,7 +5,7 @@
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
 
--export([start_new_aim/3, start_once_aim/5, 
+-export([start_new_aim/3, start_once_aim/4, 
          api_callback/5, start_link_session/6,
          start_shell_process/2, 
          result/1, api_var_match/1,
@@ -53,7 +53,10 @@ start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
                                       namespace = NameSpace,
                                       request_type = Type}),       
     Pid.
-
+    
+start_once_aim(Msg, NameSpace, CallBack ,ConfigNameSpace)->
+    start_once_aim(Msg, NameSpace, CallBack, self() ,ConfigNameSpace).    
+    
 start_once_aim({error, Description}, _NameSpace,_,_, _ConfigNameSpace)->
     Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params with ",Binary/binary>>}]);
@@ -217,7 +220,7 @@ api_handle_command([<<"once">>, NameSpace, Aim], Req3, {PostVals, Params, Config
     CallBack = proplists:get_value(<<"callback">>, PostVals),
     Msg = generate_prolog_msg(Params, list_to_atom(binary_to_list(Aim)) ),    
     ?WEB_REQS("~n generate aim ~p",[Msg]),
-    Response =  start_once_aim(Msg, NameSpace, CallBack, self(), ConfigNameSpace),
+    Response =  start_once_aim(Msg, NameSpace, CallBack, ConfigNameSpace),
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, json_headers(),
         Response, Req3);
