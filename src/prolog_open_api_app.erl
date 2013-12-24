@@ -18,9 +18,10 @@ stop(_State) ->
 start_listener() ->
         Dispatch = cowboy_router:compile([
                     {'_', [
-                        {"/prolog/[...]", api_erws_handler, []},
+                        {"/prolog/[...]", api_erws_handler, [] },
+                        {"/lokomotiv/[...]", lokomotiv_api, [] },
                         {"/monitor", prolog_open_api_monitor_handler, []},
-                        {"/websocket", prolog_open_api_monitor_ws_handler, []},
+                        {"/monitor_websocket", prolog_open_api_monitor_ws_handler, []},
                         {"/api/[...]", cowboy_static, [
                             {directory, <<"static">>},
                             {mimetypes, {fun mimetypes:path_to_mimes/2, default}}
