@@ -55,14 +55,15 @@ auth_fail() ->
      false}.
 
 process(Body, _Type, _Ip, _Headers) ->
-    ?LOG_INFO("Starting process...", []),
+    ?LOG_INFO("Starting process... ~n", []),
     DataBody = jsx:decode(Body),
     [List] = DataBody,
     {_Ops, [Attrs]} = List,
-    Data = unicode:characters_to_list( proplists:get_value(<<"data">>,
-					    Attrs)),
-    Extra = unicode:characters_to_list( proplists:get_value(<<"extra">>,
-					     Attrs)),
+    ?LOG_INFO("params ~p~n", [Attrs]),
+    Data =  proplists:get_value(<<"data">>,
+					    Attrs),
+    Extra =  proplists:get_value(<<"extra">>,
+					     Attrs),
     NameSpace = proplists:get_value(<<"namespace">>, Extra),
     Aim = proplists:get_value(<<"aim">>, Extra),
     ParamsCount = proplists:get_value(<<"params_count">>,
