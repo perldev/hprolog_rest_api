@@ -27,9 +27,8 @@ handle( <<"POST">>, Req, State ) ->
             { Path, Req4 } = cowboy_req:path_info( Req3 ),
             {Headers, Req5} = cowboy_req:headers(Req4),
             {Peer, Req6}    = cowboy_req:peer(Req5),
-            Ip = util:peer_addr(Headers, Peer),
-            ?LOG_INFO("~n INFO: Request from ~p:~n~ts~n",[Ip,binary_to_list(Body)]),
-            lokomotiv_handler:handler( Path, Body, Type, Ip, Headers, Req6 )
+            ?LOG_INFO("~n INFO: Request from ~p:~n~ts~n",[Peer, Body ]),
+            lokomotiv_handler:handler( Path, Body, Type, Peer, Headers, Req6 )
     end,
     { ok, Req2, State };
     
