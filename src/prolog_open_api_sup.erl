@@ -15,5 +15,4 @@ init([]) ->
              {api_auth_demon, start_link, [prolog_open_api] },
              permanent, infinity, worker , [ api_auth_demon]         
         },
-        
-        {ok, {{one_for_one, 5, 10}, [   ]}}.  
+        {ok, {{one_for_one, 5, 10}, [  AuthDemon ]}}.  

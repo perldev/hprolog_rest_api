@@ -64,12 +64,14 @@ process(Body, _Type, _Ip, _Headers) ->
 					    Attrs),
     Extra =  proplists:get_value(<<"extra">>,
 					     Attrs),
-    NameSpace = proplists:get_value(<<"namespace">>, Extra),
+    NameSpace = binary_to_list( proplists:get_value(<<"namespace">>, Extra) ),
     Aim = proplists:get_value(<<"aim">>, Extra),
     ParamsCount = proplists:get_value(<<"params_count">>,
 				      Extra),
-				      
-    call_aim(NameSpace, Aim, ParamsCount, Extra, Data).
+    ParamsCountInt = binary_to_integer(ParamsCount),	
+    AtomAim = binary_to_existing_atom(Aim, unicode),
+    
+    call_aim(NameSpace, AtomAim, ParamsCountInt, Extra, Data).
 
 call_aim(undefined, _Aim, _ParamsCount, _Extra,
 	 _Data) ->
@@ -78,8 +80,8 @@ call_aim(_, undefined, _ParamsCount, _Extra, _Data) ->
     invalid_params();
 call_aim(_, _Aim, undefined, _Extra, _Data) ->
     invalid_params();
-call_aim(NameSpace, Aim, ParamsCount, Extra, Data) ->
-    ParamsCountInt = binary_to_integer(ParamsCount),
+call_aim(NameSpace, Aim, ParamsCountInt, Extra, Data) ->
+   
     
     Res = generate_params(1, ParamsCountInt, Extra, Data,
 			  []),

@@ -16,35 +16,9 @@ handler( Path, Body, Type, Ip, Headers, Req6 ) ->
                     cowboy_req:reply( 400, [], <<"error">>, Req6 )
             end,
 
-            %running in another process(for debug)
-            %spawn(fun() ->case plugins_handler:request( Path, Body, Type, Ip, Headers ) of
-%             if
-%              is_tuple(IsPost) ->
-%                case post_process( Path, Body, Type, Ip, Headers, IsPost ) of
-%                 { ok, _List } ->                
-%                     ?LOG_INFO("PostProcess: ok...",[]);
-%                 _Error -> 
-%                     ?LOG_ERROR("Error...",[])
-%                end;
-%              true -> ok
-%             end,
+
             { ok, ReqZ }.
   
-%post_process( [<<"send_sms">>], Body, Type, Ip, Headers ) ->
-%    plugins_sms:proc(Body, Type, Ip, Headers);
-            
-% init HTTP connection
-% % post_process( Path, Body, Type, Ip, Headers, IsPost ) ->
-% %         case Path of
-% %           [<<"node">>] -> 
-% %             plugins_node:post_process(Body, Type, Ip, Headers, IsPost);
-% %           _ ->
-% %             ?LOG_ERROR("Empty post_process (path=~p)",Path)
-% %         end,
-% % 
-% % 
-% %         { ok, [] }.
-
 
 
 process(Path, Body, Type, Ip, Headers) ->

@@ -277,7 +277,7 @@ api_handle([Cmd, ID], Req, State) ->
     end;
 api_handle([Cmd, ID, SomeThing], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
-    {{Ip,_}, Req1_} = cowboy_req:peer(Req),
+    { {Ip,_}, Req1_} = cowboy_req:peer(Req),
     {ok, PostVals, Req2_} = cowboy_req:body_qs(Req1_),
     
     
