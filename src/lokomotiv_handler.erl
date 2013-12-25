@@ -8,6 +8,8 @@ handler( Path, Body, Type, Ip, Headers, Req6 ) ->
             { ok, ReqZ } = 
                 case Code of
                 ok ->
+                    ?LOG_INFO("Response to ~p to json ",[Ans]),
+
                     BAns = jsx:encode(Ans),
                     ?LOG_INFO("Response to ~p OK:~ts",[Ip, unicode:characters_to_list(BAns)]),
                     cowboy_req:reply( 200, [], BAns, Req6 );
