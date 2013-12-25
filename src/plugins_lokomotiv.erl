@@ -68,6 +68,7 @@ process(Body, _Type, _Ip, _Headers) ->
     Aim = proplists:get_value(<<"aim">>, Extra),
     ParamsCount = proplists:get_value(<<"params_count">>,
 				      Extra),
+				      
     call_aim(NameSpace, Aim, ParamsCount, Extra, Data).
 
 call_aim(undefined, _Aim, _ParamsCount, _Extra,
@@ -79,6 +80,7 @@ call_aim(_, _Aim, undefined, _Extra, _Data) ->
     invalid_params();
 call_aim(NameSpace, Aim, ParamsCount, Extra, Data) ->
     ParamsCountInt = binary_to_integer(ParamsCount),
+    
     Res = generate_params(1, ParamsCountInt, Extra, Data,
 			  []),
 			  
@@ -127,7 +129,7 @@ generate_params(Index, Index, Extra, Data, Result) ->
 	of
       undefined -> {error, not_found_params, Index};
       Value ->
-	  ParamVal = process_value(trim(Value), Data),
+	  ParamVal = process_value(Value, Data),
 	  Result ++ [ParamVal]    %json array
     end;
 generate_params(Index, ParamsCountInt, Extra, Data,
@@ -144,8 +146,9 @@ generate_params(Index, ParamsCountInt, Extra, Data,
 
 %%template var
 process_value(<<"{{", Binary/binary>>, Data) ->
-    NewBinary = binary:replace(Binary, [<<"}">>, <<" ">>],
+    NewBinary =  binary:replace(Binary, [<<"}">>, <<" ">>],<<>>,
 			       [global]),
+			       
     api_erws_handler:process_json_params( proplists:get_value(NewBinary, Data, undefined) );
 %%variable to fill after aim
 process_value(Bin = <<"{", _Binary/binary>>, _Data) ->
