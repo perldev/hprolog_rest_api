@@ -9,7 +9,7 @@
 -define(TIMEOUT, 5000).
 
 invalid_params() ->
-    {<<"ok">>,
+    {<<"error">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>, [{<<"__prolog_status">>, <<"fail">>}]},
        {<<"proc">>, <<"ok">>}]],
@@ -41,14 +41,14 @@ normal_false() ->
 
      
 custom_fail(Status) ->
-    {<<"ok">>,
+    {<<"error">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>, [{<<"__prolog_status">>,Status} ]},
        {<<"proc">>, <<"error">>}]],
      false}.
 
 request_fail(Res) ->
-    {<<"ok">>,
+    {<<"error">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"request_fail">>}, {<<"description">>, Res } ]},
@@ -56,7 +56,7 @@ request_fail(Res) ->
      false}.
 
 auth_fail() ->
-    {<<"ok">>,
+    {<<"error">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"auth_fail">>}]},
@@ -67,6 +67,7 @@ auth_fail() ->
 process(Body, _Type, _Ip, _Headers)->
       case  catch call_process(Body) of
         {'EXIT', Reason}->
+                ?LOG_INFO(" fatal error ~p ~n", [ Reason]),
                 request_fail( term_to_binary(Reason) );
         Res -> Res
       end  
