@@ -199,6 +199,7 @@ process_value(SomeVal, _Data) -> api_erws_handler:process_json_params(SomeVal).
 return_result([], _Params) -> normal_params([]);
 return_result(Result, Params) ->
     BoundList = bound_results(Result, Params, []),
+    ?LOG_INFO("~p after bound aim ~p~n",[?LINE, BoundList]),
     normal_params(BoundList).
 
 %%order is not important
@@ -206,7 +207,7 @@ bound_results([], [], Acum) -> Acum;
 bound_results([Head | Tail], [CallHead | TailParams],
 	      Acum) ->
     NewAcum = case CallHead of
-		[ { VarNameToFill} ] when is_atom(VarNameToFill) ->
+		 { VarNameToFill}  when is_atom(VarNameToFill) ->
 		    [ {VarNameToFill, Head} | Acum];
 		Head -> Acum;    
 		CallHead -> Acum
