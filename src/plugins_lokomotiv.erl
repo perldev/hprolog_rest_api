@@ -44,15 +44,12 @@ custom_fail(Status) ->
     {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>, [{<<"__prolog_status">>,Status} ]},
-       {<<"proc">>, <<"error">>}]],
+       {<<"proc">>, <<"ok">>}]],
      false}.
 
 request_fail(Res) ->
     {<<"ok">>,
-     [[{<<"type">>, <<"data">>},
-       {<<"res_data">>,
-	[{<<"__prolog_status">>, <<"request_fail">>}, {<<"description">>, Res } ]},
-       {<<"proc">>, <<"error">>}]],
+     [[{<<"type">>, <<"data">>},{<<"res_data">>, [{<<"__prolog_status">>, <<"request_fail">>}, {<<"description">>, Res } ] },{<<"proc">>, <<"ok">>} ]],
      false}.
 
 auth_fail() ->
@@ -60,7 +57,7 @@ auth_fail() ->
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"auth_fail">>}]},
-       {<<"proc">>, <<"error">>}]],
+       {<<"proc">>, <<"ok">>}]],
      false}.
 
      
@@ -68,7 +65,7 @@ process(Body, _Type, _Ip, _Headers)->
       case  catch call_process(Body) of
         {'EXIT', Reason}->
                 ?LOG_INFO(" fatal error ~p ~n", [ Reason]),
-                request_fail( term_to_binary(Reason) );
+                request_fail( <<"bad argumets">>  );
         Res -> Res
       end  
 .
