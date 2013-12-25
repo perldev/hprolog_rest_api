@@ -96,13 +96,15 @@ request(NameSpace, Msg) ->
 
 aim(NameSpace, _, error)->
          auth_fail();
-aim(NameSpace, Msg, ConfigNameSpace)->
+aim(NameSpace, AimMsg, ConfigNameSpace)->
         
         NewSession = erlang:make_ref(),
         BackPid  = self(),
+         Msg = list_to_tuple(AimMsg),
         ?LOG_INFO("~p send aim  ~p~n",[?LINE, {NewSession, Msg, NameSpace, ConfigNameSpace }]),
-
-        Pid = api_erws_handler:start_link_session(NewSession, list_to_tuple(Msg), NameSpace, undefined, undefined, {once, BackPid}), 
+       
+        
+        Pid = api_erws_handler:start_link_session(NewSession,Msg , NameSpace, undefined, undefined, {once, BackPid}), 
         Pid ! { some_code, NewSession, Msg },
 %         process_req(NewSession, Msg),
         SlTimeOut = api_auth_demon:get_dict_default(?API_SL_TIMEOUT, ConfigNameSpace, ?FATAL_TIME_ONCE), 
