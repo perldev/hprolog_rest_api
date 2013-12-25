@@ -30,20 +30,29 @@ normal_params(Result) ->
 	[{<<"__prolog_status">>, <<"true">>} | Result]},
        {<<"proc">>, <<"ok">>}]],
      false}.
-
-custom_fail(Status) ->
-    {<<"ok">>,
-     [[{<<"type">>, <<"data">>},
-       {<<"res_data">>, [{<<"__prolog_status">>, Status}]},
-       {<<"proc">>, <<"ok">>}]],
-     false}.
-
-request_fail() ->
+     
+normal_false() ->
     {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
-	[{<<"__prolog_status">>, <<"request_fail">>}]},
+        [{<<"__prolog_status">>, <<"false">>} ]},
        {<<"proc">>, <<"ok">>}]],
+     false}.
+
+     
+custom_fail(Status) ->
+    {<<"ok">>,
+     [[{<<"type">>, <<"data">>},
+       {<<"res_data">>, [{<<"__prolog_status">>,Status} ]},
+       {<<"proc">>, <<"error">>}]],
+     false}.
+
+request_fail(Res) ->
+    {<<"ok">>,
+     [[{<<"type">>, <<"data">>},
+       {<<"res_data">>,
+	[{<<"__prolog_status">>, <<"request_fail">>}, {<<"description">>, Res } ]},
+       {<<"proc">>, <<"error">>}]],
      false}.
 
 auth_fail() ->
@@ -51,10 +60,19 @@ auth_fail() ->
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"auth_fail">>}]},
-       {<<"proc">>, <<"ok">>}]],
+       {<<"proc">>, <<"error">>}]],
      false}.
 
-process(Body, _Type, _Ip, _Headers) ->
+     
+process(Body, _Type, _Ip, _Headers)->
+      case  catch call_process(Body) of
+        {'EXIT', Reason}->
+                request_fail( term_to_binary(Reason) );
+        Res -> Res
+      end  
+.
+
+call_process(Body) ->
     ?LOG_INFO("Starting process... ~n", []),
     DataBody = jsx:decode(Body),
     [List] = DataBody,
@@ -110,11 +128,11 @@ aim(NameSpace, AimMsg, ConfigNameSpace)->
         SlTimeOut = api_auth_demon:get_dict_default(?API_SL_TIMEOUT, ConfigNameSpace, ?FATAL_TIME_ONCE), 
         receive 
             {result, false } ->
-                     custom_fail(false);
+                     normal_false();
             {result, fail } ->
-                     custom_fail(fail);         
+                     custom_fail(<<"fail">>);         
             {result, unexpected_error } ->
-                     custom_fail(unexpected_error);  
+                     custom_fail(<<"unexpected_error">>);  
             {result, SomeThing} ->
 %                      {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
                      ResList  = tuple_to_list(SomeThing),
@@ -207,8 +225,8 @@ bound_results([], [], Acum) -> Acum;
 bound_results([Head | Tail], [CallHead | TailParams],
 	      Acum) ->
     NewAcum = case CallHead of
-		 { VarNameToFill}  when is_atom(VarNameToFill) ->
-		    [ {VarNameToFill, Head} | Acum];
+		 { VarNameToFill }  when is_atom(VarNameToFill) ->
+		          [ { VarNameToFill, api_erws_handler:api_var_match(Head) } | Acum ];
 		Head -> Acum;    
 		CallHead -> Acum
 	      end,

@@ -107,14 +107,14 @@ start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
 
 is_flatten([])->
     false;
-is_flatten([Head|List]) when is_list(Head)->
+is_flatten([Head|_List]) when is_list(Head)->
     true;
 is_flatten([_Head|List])->
     is_flatten(List).
     
 api_var_match( Val ) when is_tuple(Val) ->
           list_to_binary( io_lib:format("~p",[Val]));
-api_var_match({{ Key }, Val} ) when is_float(Val)->
+api_var_match({{ _Key }, Val} ) when is_float(Val)->
           Val;
 api_var_match( Val ) when is_integer(Val)->
           Val; 
@@ -138,7 +138,7 @@ api_var_match({{ Key }, Val} ) when is_float(Val)->
 api_var_match({{ Key }, Val} ) when is_integer(Val)->
     [{Key , Val}]; 
 	
-api_var_match({{ Key }, Val} ) when is_list(Val) -> 
+api_var_match({{ _Key }, Val} ) when is_list(Val) -> 
 	 case is_flatten(Val) of
                 true ->
                         lists:map( fun api_var_match/1, Val ) ;
@@ -577,8 +577,10 @@ process_json_params("null")->
        "";       
 process_json_params(null)->
        "";    
-process_json_params(E) when is_number(E)->
-       E;    
+process_json_params(E) when is_float(E)->
+       float_to_list(E); 
+process_json_params(E) when is_integer(E)->
+       integer_to_list(E);    
 process_json_params(E) when is_list(E)->
        proc_object(E);
 process_json_params(E) when is_binary(E)->
