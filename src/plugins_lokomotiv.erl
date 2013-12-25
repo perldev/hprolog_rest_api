@@ -9,7 +9,7 @@
 -define(TIMEOUT, 5000).
 
 invalid_params() ->
-    {<<"error">>,
+    {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>, [{<<"__prolog_status">>, <<"fail">>}]},
        {<<"proc">>, <<"ok">>}]],
@@ -41,14 +41,14 @@ normal_false() ->
 
      
 custom_fail(Status) ->
-    {<<"error">>,
+    {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>, [{<<"__prolog_status">>,Status} ]},
        {<<"proc">>, <<"error">>}]],
      false}.
 
 request_fail(Res) ->
-    {<<"error">>,
+    {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"request_fail">>}, {<<"description">>, Res } ]},
@@ -56,7 +56,7 @@ request_fail(Res) ->
      false}.
 
 auth_fail() ->
-    {<<"error">>,
+    {<<"ok">>,
      [[{<<"type">>, <<"data">>},
        {<<"res_data">>,
 	[{<<"__prolog_status">>, <<"auth_fail">>}]},
