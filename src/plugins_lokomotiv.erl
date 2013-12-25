@@ -100,7 +100,7 @@ aim(NameSpace, Msg, ConfigNameSpace)->
         
         NewSession = erlang:make_ref(),
         BackPid  = self(),
-        ?LOG_INFO("~p send aim  ~p~n",[?LINE, {SomeThing,  Msg, NameSpace }]),
+        ?LOG_INFO("~p send aim  ~p~n",[?LINE, {NewSession, Msg, NameSpace, ConfigNameSpace,   }]),
 
         Pid = api_erws_handler:start_link_session(NewSession, list_to_tuple(Msg), NameSpace, undefined, undefined, {once, BackPid}), 
         Pid ! { some_code, NewSession, Msg },
