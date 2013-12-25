@@ -100,7 +100,7 @@ aim(NameSpace, AimMsg, ConfigNameSpace)->
         
         NewSession = erlang:make_ref(),
         BackPid  = self(),
-         Msg = list_to_tuple(AimMsg),
+        Msg = list_to_tuple(AimMsg),
         ?LOG_INFO("~p send aim  ~p~n",[?LINE, {NewSession, Msg, NameSpace, ConfigNameSpace }]),
        
         
@@ -117,9 +117,9 @@ aim(NameSpace, AimMsg, ConfigNameSpace)->
                      custom_fail(unexpected_error);  
             {result, SomeThing} ->
 %                      {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
-                      ResList  = tuple_to_list(SomeThing),
-                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
-                     return_result(ResList, Msg)
+                     ResList  = tuple_to_list(SomeThing),
+                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  AimMsg }]),
+                     return_result(ResList, AimMsg)
              after SlTimeOut ->
                     exit(Pid, timeout),
                     timeout_fail()
