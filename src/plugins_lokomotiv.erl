@@ -161,8 +161,8 @@ generate_params(Index, ParamsCountInt, Extra, Data,
     case proplists:get_value(<<"X", BinIn/binary>>, Extra)
 	of
       undefined -> {error, not_found_params, Index};
-      PreVal ->
-          Value =  cowboy_http:urldecode(PreVal),
+      Value ->
+          
 	  ParamVal = process_value(trim( Value ), Data),
 	  generate_params(Index + 1, ParamsCountInt, Extra, Data,
 			  Result ++ [ParamVal])
@@ -172,8 +172,14 @@ generate_params(Index, ParamsCountInt, Extra, Data,
 process_value(<<"{{", Binary/binary>>, Data) ->
     NewBinary =  binary:replace(Binary, [<<"}">>, <<" ">>],<<>>,
 			       [global]),
-			       
-    api_erws_handler:process_json_params( proplists:get_value(NewBinary, Data, undefined) );
+    case  proplists:get_value(NewBinary, Data, undefined) of 
+        undefined ->
+                 api_erws_handler:process_json_params( null );
+        PreVal ->
+                Value =  cowboy_http:urldecode(PreVal),
+                api_erws_handler:process_json_params( Value )
+                 
+    end;
 %%variable to fill after aim
 process_value(Bin = <<"{", _Binary/binary>>, _Data) ->
   api_erws_handler:process_json_params( jsx:decode(Bin) );
