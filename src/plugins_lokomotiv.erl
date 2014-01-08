@@ -161,8 +161,9 @@ generate_params(Index, ParamsCountInt, Extra, Data,
     case proplists:get_value(<<"X", BinIn/binary>>, Extra)
 	of
       undefined -> {error, not_found_params, Index};
-      Value ->
-	  ParamVal = process_value(trim(Value), Data),
+      PreVal ->
+          Value =  cowboy_http:urldecode(PreVal),
+	  ParamVal = process_value(trim( Value ), Data),
 	  generate_params(Index + 1, ParamsCountInt, Extra, Data,
 			  Result ++ [ParamVal])
     end.
@@ -176,7 +177,8 @@ process_value(<<"{{", Binary/binary>>, Data) ->
 %%variable to fill after aim
 process_value(Bin = <<"{", _Binary/binary>>, _Data) ->
   api_erws_handler:process_json_params( jsx:decode(Bin) );
-process_value(SomeVal, _Data) -> api_erws_handler:process_json_params(SomeVal).
+process_value(SomeVal, _Data) -> 
+api_erws_handler:process_json_params(SomeVal).
 
 %%%we can do using rpc call, but there are some troubles with authorization
 % aim(NameSpace, Aim, Params, SourceParams) ->
