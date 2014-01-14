@@ -6,7 +6,7 @@
 -include_lib("eprolog/include/prolog.hrl").
 
 -export([start_new_aim/3, start_once_aim/4, 
-         api_callback/5, start_link_session/6,
+         api_callback/6, start_link_session/6,
          start_shell_process/2, 
          result/1, api_var_match/1,
          get_result/2, generate_http_resp/2, process_req/2, 
@@ -68,14 +68,15 @@ start_once_aim(Msg, NameSpace, undefined, BackPid, ConfigNameSpace)->
         process_req(NewSession, Msg),
         SlTimeOut = api_auth_demon:get_dict_default(?API_SL_TIMEOUT, ConfigNameSpace, ?FATAL_TIME_ONCE), 
         receive 
-            {result, false } ->
-                      jsx:encode( [ {status, false} ]);
-            {result, SomeThing} ->
-%                      {true, NewLocalContext } = prolog_matching:var_match(SomeThing, Msg, dict:new()),
+            {result, false, _} ->
+                     jsx:encode( [ {status, false} ]);
+            {result, SomeThing, Context} ->
+            
                      [_Arg|Params]  = tuple_to_list(SomeThing),
                      ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
                      VarsRes = lists:map(fun api_var_match/1, Params ),
-                     jsx:encode( [ {status, true}, {result, VarsRes} ] )
+                     VarsList = lists:map(fun api_var_match/1, dict:to_list(Context) ),
+                     jsx:encode( [ {status, true}, {result, VarsRes} | VarsList ] )
             after SlTimeOut ->
                     exit(Pid, timeout),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
@@ -169,9 +170,7 @@ get_result(Session, _NameSpace)->
 		exit(Pid, finish),
 		unexpected_error;	
 	[ #api_record{result = Result, prototype = ProtoType }] ->
-            
-%                 {true, NewLocalContext } = prolog_matching:var_match(SomeThing, ProtoType, dict:new()),
-                 [_| Params]     = tuple_to_list(Result),
+                [_| Params]     = tuple_to_list(Result),
 	        ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {Result,  ProtoType}]),
 	        VarsRes = lists:map(fun api_var_match/1, Params ),
 		jsx:encode( [ {status, true}, {result, VarsRes}])
@@ -278,9 +277,7 @@ api_handle([Cmd, ID], Req, State) ->
 api_handle([Cmd, ID, SomeThing], Req, State) ->
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
     { {Ip,_}, Req1_} = cowboy_req:peer(Req),
-    {ok, PostVals, Req2_} = cowboy_req:body_qs(Req1_),
-    
-    
+    {ok, PostVals, Req2_} = cowboy_req:body_qs(Req1_),   
     AuthInfo = proplists:get_value(<<"auth">>, PostVals),
     Params = proplists:get_value(<<"params">>, PostVals),
     {Path, Req1} =cowboy_req:path(Req2_),
@@ -342,21 +339,20 @@ process_req(Session, Msg)->
 		  not_found
       end.
 
-%%TODO rework
+%%TODO refactoring this
 start_shell_process(Session, NameSpace)->
     NewTree = ets:new(treeEts,[ public, set, { keypos, 2}]),
     IsHbase = api_auth_demon:get_source(NameSpace),
     ets:insert(NewTree, {system_record, hbase, IsHbase}),
     ets:insert(NewTree, {system_record, ?PREFIX, NameSpace}),
     shell_loop(start, NewTree, Session).
-
-      
+    
 shell_loop(start, TreeEts, Back) ->
     %%REWRITE it like trace
 	receive 
 	    {some_code, Back, Goal}->	  
 		    ?API_LOG("~p wait new aim from user ~p",[{?MODULE,?LINE}, {self(),Goal}]),
-			{TempAim, _ShellContext} =  prolog_shell:make_temp_aim(Goal), 
+                    {TempAim, _ShellContext} =  prolog_shell:make_temp_aim(Goal), 
                     ?LOG_DEBUG("TempAim : ~p~n", [TempAim]),
                     ?LOG_DEBUG("~p make temp aim ~p ~n",[{?MODULE,?LINE}, TempAim]),
                     StartTime = erlang:now(),
@@ -390,14 +386,14 @@ process_prove(Back, TempAim , Goal, Res, _StartTime, TreeEts)->
     case Res of 
         {'EXIT', _FromPid, _Reason} ->
             ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal}]),
-            store_result(Back, false),
+            store_result(Back, false, undefined),
             prolog:clean_tree(TreeEts),
             ets:delete(TreeEts),
             finish;
         false ->
             ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal}]),
 %             _FinishTime = erlang:now(), %%TODO
-            store_result(Back, false),
+            store_result(Back, false, undefined),
             prolog:clean_tree(TreeEts),
             ets:delete(TreeEts),
             false;  
@@ -405,17 +401,17 @@ process_prove(Back, TempAim , Goal, Res, _StartTime, TreeEts)->
             ?LOG_DEBUG("~p got from prolog shell aim ~p~n",[?LINE ,{TempAim, Goal}]),
 %             _FinishTime = erlang:now(), %%TODO
             New = prolog_matching:bound_body(Goal, SomeContext),
-            store_result(Back, New),
+            store_result(Back, New, SomeContext),
             Prev;                  
         UNEXPECTED ->
             ?API_LOG("~p UNEXPECTED  ~p",[{?MODULE,?LINE}, UNEXPECTED]),
-            store_result(Back, unexpected_error),
+            store_result(Back, unexpected_error, undefined),
             prolog:clean_tree(TreeEts),
             ets:delete(TreeEts),
             finish
      end.
 
-store_result(Session ,R) ->
+store_result(Session, R, Context) ->
     case ets:lookup(?ERWS_API, Session) of
 	    []-> false;%TODO clean all 
 	    [ ApiRecord = #api_record{callbackurl = undefined, request_type = call } ]->
@@ -423,19 +419,19 @@ store_result(Session ,R) ->
 		    true;
             [  #api_record{callbackurl = undefined,  request_type = { once, BackPid } } ]->
                     ets:delete(?ERWS_API, Session),
-                    BackPid ! {result, R},            
+                    BackPid ! {result, R, Context},            
                     exit(normal);
              [ ApiRecord = #api_record{callbackurl = CallBackUrl } ]->
                     ?WEB_REQS("~p process callback   ~p ~n result ~p~n",[{?MODULE,?LINE}, ApiRecord, R]),
                     case ApiRecord#api_record.request_type  of
                         call ->
                             ets:insert(?ERWS_API, ApiRecord#api_record{result = R} ),                            
-                            api_callback(R, Session,  ApiRecord#api_record.prototype, 
+                            api_callback(R, Session, Context, ApiRecord#api_record.prototype, 
                                         CallBackUrl, ApiRecord#api_record.api_salt ),
                             true;
                         once ->
                             delete_session(Session),
-                            api_callback(R, Session,  ApiRecord#api_record.prototype, 
+                            api_callback(R, Session, Context,   ApiRecord#api_record.prototype, 
                                     CallBackUrl, ApiRecord#api_record.api_salt ),
                             exit(normal)        
                             
@@ -462,7 +458,7 @@ get_auth_salt(Post, SaltL )->
 .
           
     
-api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->    
+api_callback(unexpected_error, Session, _Context,  ProtoType, CallBackUrl, Salt )->    
                 [_| Params]     = tuple_to_list(ProtoType),
                 
                 VarsRes = lists:map( fun api_var_match/1, Params ),
@@ -491,7 +487,7 @@ api_callback(unexpected_error, Session,  ProtoType, CallBackUrl, Salt )->
                 end
 
 ;
-api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
+api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
@@ -520,10 +516,11 @@ api_callback(false, Session,  ProtoType, CallBackUrl, Salt)->
 
 
 ;
-api_callback(Res, Session,  _ProtoType, CallBackUrl, Salt)->
-                [_| Params]     = tuple_to_list(Res),
-                VarsRes = lists:map( fun api_callback_process_params/1, Params ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes}]),
+api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
+                [_| Params]  = tuple_to_list(Res),
+                VarsRes  = lists:map( fun api_callback_process_params/1, Params ),
+                VarsList = lists:map(fun api_var_match/1, dict:to_list(Context) ),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} | VarsList]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
