@@ -71,12 +71,12 @@ start_once_aim(Msg, NameSpace, undefined, BackPid, ConfigNameSpace)->
             {result, false, _} ->
                      jsx:encode( [ {status, false} ]);
             {result, SomeThing, Context} ->
-            
-                     [_Arg|Params]  = tuple_to_list(SomeThing),
                      ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
+                     [_Arg|Params]  = tuple_to_list(SomeThing),
+                     
                      VarsRes = lists:map(fun api_var_match/1, Params ),
                      VarsList = lists:map(fun api_var_match/1, dict:to_list(Context) ),
-                     jsx:encode( [ {status, true}, {result, VarsRes} | VarsList ] )
+                     jsx:encode( [ {status, true}, {result, VarsRes}  ] )
             after SlTimeOut ->
                     exit(Pid, timeout),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
