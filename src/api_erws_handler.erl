@@ -72,11 +72,10 @@ start_once_aim(Msg, NameSpace, undefined, BackPid, ConfigNameSpace)->
                      jsx:encode( [ {status, false} ]);
             {result, SomeThing, Context} ->
                      ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
-                     [_Arg|Params]  = tuple_to_list(SomeThing),
-                     
-                     VarsRes = lists:map(fun api_var_match/1, Params ),
-                     VarsList = lists:map(fun api_var_match/1, dict:to_list(Context) ),
-                     jsx:encode( [ {status, true}, {result, VarsRes}  ] )
+                     [_Arg| Params]  = tuple_to_list(SomeThing),
+                     VarsRes = lists:map( fun  api_var_match/1, Params ),
+                     VarsList = lists:map( fun api_var_match_vars/1, dict:to_list(Context) ),
+                     jsx:encode( [ {status, true}, {result, VarsRes} | VarsList ] )
             after SlTimeOut ->
                     exit(Pid, timeout),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
@@ -113,6 +112,24 @@ is_flatten([Head|_List]) when is_list(Head)->
 is_flatten([_Head|List])->
     is_flatten(List).
     
+api_var_match_vars({{ Key }, Val} ) when is_tuple(Val) ->
+    {  erlang:atom_to_binary(Key, unicode), list_to_binary( io_lib:format("~p",[Val]))};
+api_var_match_vars({{ Key }, Val} ) when is_float(Val)->
+    {  erlang:atom_to_binary(Key, unicode), Val };
+api_var_match_vars({{ Key }, Val} ) when is_list(Val)->
+        case is_flatten(Val) of
+                true ->
+                        lists:map( fun api_var_match_vars/1, Val ) ;
+                _    ->
+                       { erlang:atom_to_binary(Key, unicode), unicode:characters_to_binary(Val) }
+        end
+;
+api_var_match_vars({{ Key }, Val} ) when is_integer(Val)->
+    { erlang:atom_to_binary(Key, unicode) , Val}.
+    
+    
+    
+    
 api_var_match( Val ) when is_tuple(Val) ->
           list_to_binary( io_lib:format("~p",[Val]));
 api_var_match({{ _Key }, Val} ) when is_float(Val)->
@@ -129,32 +146,14 @@ api_var_match( Val ) when is_list(Val) ->
 api_var_match( [])->
      <<"">>;
 %%%%TODO avoid this
-api_var_match( Val ) when is_atom(Val)-> 
-   [ {<<"atom">>, list_to_binary( atom_to_list(Val))}];
-
-api_var_match({{ Key }, Val} ) when is_tuple(Val) ->
-    [{Key, list_to_binary( io_lib:format("~p",[Val]))}];
-api_var_match({{ Key }, Val} ) when is_float(Val)->
-    [{Key , Val }];
-api_var_match({{ Key }, Val} ) when is_integer(Val)->
-    [{Key , Val}]; 
-	
-api_var_match({{ _Key }, Val} ) when is_list(Val) -> 
-	 case is_flatten(Val) of
-                true ->
-                        lists:map( fun api_var_match/1, Val ) ;
-                _ ->
-                        unicode:characters_to_binary(Val)
-         end;  	    
+api_var_match( Val ) when is_atom(Val) -> 
+   [ {<<"atom">>, list_to_binary( atom_to_list(Val) ) } ];   
 api_var_match({ { Key }, []})->
-   [{Key, <<"">>}];
-%%%%TODO avoid this
-api_var_match({ { Key }, Val}) when is_atom(Val)-> 
-   [{Key, [ {<<"atom">>, list_to_binary( atom_to_list(Val))}]}];
-api_var_match({ { Key }, Val }) -> 
-   [{ Key, list_to_binary(io_lib:format("~p",[Val]) )}];
+    <<"">>;
 api_var_match( Val ) -> 
-    Val.
+    Val.    
+    
+    
     
 get_result(Session, _NameSpace)->
     case ets:lookup(?ERWS_API, Session) of 
@@ -519,8 +518,9 @@ api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
 api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
                 [_| Params]  = tuple_to_list(Res),
                 VarsRes  = lists:map( fun api_callback_process_params/1, Params ),
-                VarsList = lists:map(fun api_var_match/1, dict:to_list(Context) ),
+                VarsList = lists:map(fun api_var_match_vars/1, dict:to_list(Context) ),
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} | VarsList]),
+%                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} ]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
