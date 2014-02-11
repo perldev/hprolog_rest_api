@@ -421,7 +421,7 @@ check_auth(Ip, NameSpace, Config, Params) ->
 	{[{{NameSpace, Ip}, {status, on}, _}], false} -> system_off; % state off
 	{[{{NameSpace, Ip}, {status, off}, _}], false} -> system_off; % state off 
         {[{{NameSpace, Ip}, {status, off}, _}], true} -> try_again;
-        {[], _} -> false
+        {[], _} -> auth(Ip, NameSpace)
     end,
     Res.
     
