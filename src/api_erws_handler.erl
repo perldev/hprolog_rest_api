@@ -1,6 +1,5 @@
 -module(api_erws_handler).
 
--import(lists, [foldl/3,foreach/2]).
 
 -include("open_api.hrl").
 -include_lib("eprolog/include/prolog.hrl").
@@ -58,7 +57,7 @@ start_link_session_sup(TimeOut, Session, SourceMsg, NameSpace, CallBackUrl, Salt
                  worker,
                 [?MODULE] 
                 },
-       ResultOfStart = supervisor:start_child(prolog_open_api_sup, ChildSpec),
+       ResultOfStart = supervisor:start_child(eprolog_sup, ChildSpec),
        ResultOfStart.
 
        
