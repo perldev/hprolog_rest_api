@@ -19,6 +19,7 @@ start_listener() ->
         Dispatch = cowboy_router:compile([
                     {'_', [
                         {"/prolog/[...]", api_erws_handler, [] },
+                        {"/reports/[...]", api_erws_reports, [] },
                         {"/lokomotiv/[...]", lokomotiv_api, [] },
                         {"/monitor", prolog_open_api_monitor_handler, []},
                         {"/monitor_websocket", prolog_open_api_monitor_ws_handler, []},

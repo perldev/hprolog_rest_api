@@ -15,4 +15,11 @@ init([]) ->
              {api_auth_demon, start_link, [prolog_open_api] },
              permanent, infinity, worker , [ api_auth_demon]         
         },
-        {ok, {{one_for_one, 5, 10}, [  AuthDemon ]}}.  
+        Api_table_holder ={
+                "api_table_holder",
+             {api_table_holder, start_link, [] },
+             permanent, infinity, worker , [ api_table_holder]   
+        
+        },
+        {ok, {{one_for_one, 5, 10}, [  AuthDemon, Api_table_holder ]}}
+.  

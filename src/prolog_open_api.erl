@@ -1,5 +1,5 @@
 -module(prolog_open_api).
--author('Vitali Kletsko <v.kletsko@gmail.com>').
+-author('Bogdan Chayka <savemymind@gmail.com>').
 
 -export([start/0, stop/0]).
 

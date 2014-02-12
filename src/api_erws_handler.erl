@@ -6,10 +6,13 @@
 -include_lib("eprolog/include/prolog.hrl").
 
 -export([start_new_aim/3, start_once_aim/4, 
-         api_callback/6, start_link_session/6,
+         api_callback/6, 
+         start_link_session/6,
+         start_link_session_sup/6,
+         start_link_session_sup/7,
          start_shell_process/2, 
          result/1, api_var_match/1,
-         get_result/2, generate_http_resp/2, process_req/2, 
+         get_result/2, generate_http_resp/2, send_msg_to_process/2, 
          process_json_params/1, proc_object/1, process_params/2]).
 
 % Behaviour cowboy_http_handler
@@ -39,10 +42,31 @@ handle(Req, State) ->
      Result = api_handle(Path, Req1, State),
      {ok, NewReq} = Result,     
      {ok, NewReq, State}.
-    
+
+     
+
+start_link_session_sup(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type)->    
+        start_link_session_sup(?FATAL_TIME_ONCE, Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type).
+
+start_link_session_sup(TimeOut, Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type)->
+      ChildSpec = { 
+                make_ref(),
+                {?MODULE,
+                 start_link_session, [ Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type] },
+                 temporary,
+                 TimeOut,
+                 worker,
+                [?MODULE] 
+                },
+       ResultOfStart = supervisor:start_child(prolog_open_api_sup, ChildSpec),
+       ResultOfStart.
+
+       
+     
 
 start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
-    Pid = spawn(?MODULE, start_shell_process, [Session, NameSpace]),
+    Pid = spawn_link(?MODULE, start_shell_process, [Session, NameSpace]),
+    api_table_holder:register(Pid, Session),
     ets:insert(?ERWS_API, #api_record{id = Session, 
                                       aim_pid = Pid,
                                       result = wait,
@@ -51,8 +75,9 @@ start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
                                       callbackurl = CallBackUrl,
                                       api_salt = Salt,
                                       namespace = NameSpace,
-                                      request_type = Type}),       
-    Pid.
+                                      request_type = Type}),
+    
+    {ok, Pid}.
     
 start_once_aim(Msg, NameSpace, CallBack ,ConfigNameSpace)->
     start_once_aim(Msg, NameSpace, CallBack, self() ,ConfigNameSpace).    
@@ -64,27 +89,31 @@ start_once_aim(error, _NameSpace, _,_, _ConfigNameSpace)->
     jsx:encode([{status,<<"fail">>}, {description, <<"i can't parse params">>}]);
 start_once_aim(Msg, NameSpace, undefined, BackPid, ConfigNameSpace)->
         NewSession = erlang:make_ref(),
-        Pid = start_link_session(NewSession, Msg, NameSpace, undefined, undefined, {once, BackPid}), 
-        process_req(NewSession, Msg),
         SlTimeOut = api_auth_demon:get_dict_default(?API_SL_TIMEOUT, ConfigNameSpace, ?FATAL_TIME_ONCE), 
+        ResultOfStart = start_link_session_sup(SlTimeOut, NewSession, Msg, NameSpace, undefined, undefined, {once, BackPid}), 
+        ?WEB_REQS("~n~p start  aim  under supervisor ~p~n",[{?MODULE,?LINE}, ResultOfStart  ]),
+        send_msg_to_process(NewSession, Msg),
         receive 
             {result, false, _} ->
+                     ?WEB_REQS("~p got from prolog shell aim ~p~n",[{?MODULE,?LINE}, {false,  Msg }]),
                      jsx:encode( [ {status, false} ]);
             {result, SomeThing, Context} ->
-                     ?LOG_INFO("~p got from prolog shell aim ~p~n",[?LINE, {SomeThing,  Msg }]),
+                     ?WEB_REQS("~p got from prolog shell aim ~p~n",[{?MODULE,?LINE}, {SomeThing,  Msg }]),
                      [_Arg| Params]  = tuple_to_list(SomeThing),
                      VarsRes = lists:map( fun  api_var_match/1, Params ),
                      VarsList = lists:map( fun api_var_match_vars/1, dict:to_list(Context) ),
                      jsx:encode( [ {status, true}, {result, VarsRes} | VarsList ] )
             after SlTimeOut ->
-                    exit(Pid, timeout),
+                    % exit(Pid, timeout),%%this action will be done by supervisor
+                    ?WEB_REQS("~p got timeout on aim ~p~n",[{?MODULE,?LINE},  Msg ]),
                     jsx:encode([{status,<<"timeout">>}, {description, <<"default timeout has been exceeded">> }])
         end;
 start_once_aim(Msg, NameSpace, CallBackUrl, _BackPid, _ConfigNameSpace)->
         NewSession = generate_session(),
         Salt =  api_auth_demon:get_api_salt(NameSpace),
-        start_link_session(NewSession, Msg, NameSpace, CallBackUrl, Salt, once), 
-        process_req(NewSession, Msg),
+        ResultOfStart = start_link_session_sup(NewSession, Msg, NameSpace, CallBackUrl, Salt, once),
+        ?WEB_REQS("~n~p start  aim  under supervisor ~p~n",[{?MODULE,?LINE}, ResultOfStart  ]),
+        send_msg_to_process(NewSession, Msg),
         jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
         
         
@@ -99,8 +128,10 @@ start_new_aim(Msg, NameSpace, CallBackUrl) when is_tuple(Msg) ->
     %TODO make key from server
     NewSession = generate_session(),
     Salt =  api_auth_demon:get_api_salt(NameSpace),
-    start_link_session(NewSession, Msg, NameSpace, CallBackUrl, Salt, call), 
-    process_req(NewSession, Msg),
+    SlTimeOut = api_auth_demon:get_api_timeout(NameSpace), 
+    ResultOfStart = start_link_session_sup(SlTimeOut, NewSession, Msg, NameSpace, CallBackUrl, Salt, call), 
+    ?WEB_REQS("~n~p start  aim  under supervisor ~p~n",[{?MODULE,?LINE}, ResultOfStart  ]),
+    send_msg_to_process(NewSession, Msg),
     jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
 
 % lists:map(fun api_var_match/1, dict:to_list(NewLocalContext))    
@@ -148,7 +179,7 @@ api_var_match( [])->
 %%%%TODO avoid this
 api_var_match( Val ) when is_atom(Val) -> 
    [ {<<"atom">>, list_to_binary( atom_to_list(Val) ) } ];   
-api_var_match({ { Key }, []})->
+api_var_match({ { _Key }, []})->
     <<"">>;
 api_var_match( Val ) -> 
     Val.    
@@ -176,35 +207,35 @@ get_result(Session, _NameSpace)->
     end.
 
 generate_http_resp(system_off, Req) ->
-    Response  = jsx:encode([{status,<<"fail">>},{description, <<"system_off">>}]),
+    Response  = jsx:encode([ {status,<<"fail">>},{description, <<"system_off">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(try_again, Req) ->
-    Response  = jsx:encode([{status,<<"try_again">>},{description, <<"reload namespace">>}]),
+    Response  = jsx:encode([ {status,<<"try_again">>},{description, <<"reload namespace">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(session_finished, Req) ->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"session finished">>}]),
+    Response  = jsx:encode([ {status,<<"fail">>},{ description, <<"session finished">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(result_not_ready, Req)->
-    Response  = jsx:encode([{status,<<"wait">>},{ description, <<"result not ready">>}]),
+    Response  = jsx:encode([ {status,<<"wait">>},{ description, <<"result not ready">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(false, Req)->
-    Response  = jsx:encode([{status,<<"false">>},{ description, <<"aim was not reached">>}]),
+    Response  = jsx:encode([ {status, false},{ description, <<"aim was not reached">>}]),
     ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(unexpected_error, Req)->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"we have got unexpected error">>}]),
+    Response  = jsx:encode([ {status,<<"fail">>},{ description, <<"we have got unexpected error">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);
 generate_http_resp(aim_in_process, Req)->
-    Response  = jsx:encode([{status,<<"wait">>},{ description, <<"this aim in process">> } ]),
+    Response  = jsx:encode([ {status,<<"wait">>},{ description, <<"this aim in process">> } ]),
     cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(permissions_denied, Req)->
-    Response  = jsx:encode([{status,<<"false">>},{ description, <<"permissions denied for this namespace">>}]),
+    Response  = jsx:encode([ {status,false},{ description, <<"permissions denied for this namespace">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(not_found, Req)->
-    Response  = jsx:encode([{status,<<"fail">>},{ description, <<"not found">>}]),
+    Response  = jsx:encode([ {status,<<"fail">>},{ description, <<"not found">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);		
 generate_http_resp(true, Req)->
-    Response  = jsx:encode([{status,<<"true">>},{ description, <<"action was progressed normal">>}]),
+    Response  = jsx:encode([ {status, true},{ description, <<"action was progressed normal">>}]),
     ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
     cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(Json, Req)->
@@ -261,8 +292,6 @@ api_handle_command2([<<"stop_auth">>, NameSpace], Req, _) ->
     {{Ip,_}, Req1} = cowboy_req:peer(Req),
     generate_http_resp(api_auth_demon:deauth(Ip, NameSpace), Req1).
     
-
-    
 api_handle([Cmd, ID], Req, State) ->   
     ?LOG_INFO("Req: ~p namespace: ~p Cmd: ~p; State: ~p~n", [Req, ID, Cmd, State]),
      IDL = binary_to_list(ID),
@@ -279,7 +308,7 @@ api_handle([Cmd, ID, SomeThing], Req, State) ->
     {ok, PostVals, Req2_} = cowboy_req:body_qs(Req1_),   
     AuthInfo = proplists:get_value(<<"auth">>, PostVals),
     Params = proplists:get_value(<<"params">>, PostVals),
-    {Path, Req1} =cowboy_req:path(Req2_),
+    {Path, Req1} = cowboy_req:path(Req2_),
     NameSpace = binary_to_list(ID),
     case catch api_auth_demon:get_namespace_config( NameSpace ) of
         error ->
@@ -326,19 +355,21 @@ delete_session(Session) ->
 	        true;
 	    []->
 		?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session]),
-		not_found
+                throw({api_exception, not_found })
+
     end.
 	
-process_req(Session, Msg)->
+send_msg_to_process(Session, Msg)->
       case ets:lookup(?ERWS_API, Session) of
 	  [#api_record{result = wait, aim_pid = Pid}] ->
 		 Pid ! {some_code, Session, Msg},
 		 ?API_LOG("send back: ~p ~n ~p ~n ~p ~n~n", [Session, Pid, Msg]);
 	  []->
-		  not_found
+		  throw({api_exception, not_found })
       end.
 
-%%TODO refactoring this
+%%TODO refactoring this 
+%% TODO add supervisor
 start_shell_process(Session, NameSpace)->
     NewTree = ets:new(treeEts,[ public, set, { keypos, 2}]),
     IsHbase = api_auth_demon:get_source(NameSpace),

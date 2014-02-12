@@ -97,7 +97,6 @@ call_aim(_, undefined, _ParamsCount, _Extra, _Data) ->
 call_aim(_, _Aim, undefined, _Extra, _Data) ->
     invalid_params();
 call_aim(NameSpace, Aim, ParamsCountInt, Extra, Data) ->
-   
     
     Res = generate_params(1, ParamsCountInt, Extra, Data,
 			  []),

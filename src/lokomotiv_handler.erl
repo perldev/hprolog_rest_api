@@ -17,8 +17,6 @@ handler( Path, Body, Type, Ip, Headers, Req6 ) ->
                     ?LOG_ERROR("Response to ~p plugins_handler UNKNOWN ERROR",[Ip]),
                     cowboy_req:reply( 400, [], <<"error">>, Req6 )
             end,
-
-
             { ok, ReqZ }.
   
 

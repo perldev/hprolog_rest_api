@@ -2,7 +2,8 @@
 -behaviour(gen_server).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, kill_process_after/1, get_api_salt/1 ]).
+-export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, 
+         kill_process_after/1, get_api_salt/1, get_api_timeout/1 ]).
 -export([   auth/2, 
             deauth/2, 
             low_auth/3, 
@@ -197,15 +198,16 @@ get_name_space_info(Id)->
             []->
                 throw({'EXIT', public_system_not_existed})
        end.
+       
+get_api_timeout(Id)->
+     {Id, _Name, Config} =  get_name_space_info(Id),
+     get_dict_default( ?API_SL_TIMEOUT, Config, ?FATAL_TIME_ONCE )        
+.
 
        
 get_api_salt(Id)->
-    case  ets:lookup(?ETS_PUBLIC_SYSTEMS, Id) of
-       [{Id, _Name, Config}]->
-                get_dict_default(?API_SALT, Config, undefined);
-       []->
-                undefined
-    end
+     {Id, _Name, Config} =  get_name_space_info(Id),
+     get_dict_default(?API_SALT, Config, undefined)
 .
 
 get_dict_default(Key, Dict)->
