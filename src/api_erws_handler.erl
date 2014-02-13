@@ -356,7 +356,7 @@ delete_session(Session) ->
 	        true;
 	    []->
 		?LOG_INFO("~p exception ~p",[{?MODULE,?LINE},Session]),
-                throw({api_exception, not_found })
+                not_found
 
     end.
 	
@@ -366,7 +366,7 @@ send_msg_to_process(Session, Msg)->
 		 Pid ! {some_code, Session, Msg},
 		 ?API_LOG("send back: ~p ~n ~p ~n ~p ~n~n", [Session, Pid, Msg]);
 	  []->
-		  throw({api_exception, not_found })
+		   throw({api_exception, not_found})
       end.
 
 %%TODO refactoring this 
