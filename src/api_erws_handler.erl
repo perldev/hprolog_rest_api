@@ -262,11 +262,13 @@ api_handle_command([<<"create">>, NameSpace, Aim], Req3,  {PostVals, Params, _Co
     ?LOG_INFO("~n send to client ~p",[Response]),
     cowboy_req:reply(200, json_headers(),
 	Response, Req3);
+	
 api_handle_command([<<"process">>, NameSpace, Session], Req, _Params) ->    %%TODO
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
     Result  = get_result( binary_to_list(Session), NameSpace),
     generate_http_resp(Result, Req);
+    
 api_handle_command([<<"finish">>, _NameSpace, Session], Req, _Params) ->
     ?LOG_INFO("~p Received: ~p ~n~n", [{?MODULE,?LINE}, Session]),
     ?LOG_INFO(" Req: ~p ~n", [Req]),
