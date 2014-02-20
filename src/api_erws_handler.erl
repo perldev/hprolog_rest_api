@@ -234,7 +234,7 @@ generate_http_resp(not_found, Req)->
     Response  = jsx:encode([ {status,<<"fail">>},{ description, <<"not found">>}]),
     cowboy_req:reply(200, json_headers(), Response, Req);		
 generate_http_resp(true, Req)->
-    Response  = jsx:encode([ {status, true},{ description, <<"action was progressed normal">>}]),
+    Response  = jsx:encode([ {status, <<"true">>},{ description, <<"action was progressed normal">>}]),
     ?LOG_INFO("~p response ~p~n",[?LINE, Response ]),
     cowboy_req:reply(200, json_headers(), Response, Req);	
 generate_http_resp(Json, Req)->
@@ -369,8 +369,7 @@ send_msg_to_process(Session, Msg)->
 		   throw({api_exception, not_found})
       end.
 
-%%TODO refactoring this 
-%% TODO add supervisor
+%% TODO refactoring this 
 start_shell_process(Session, NameSpace)->
     NewTree = ets:new(treeEts,[ public, set, { keypos, 2}]),
     IsHbase = api_auth_demon:get_source(NameSpace),
