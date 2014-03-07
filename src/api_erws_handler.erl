@@ -484,7 +484,7 @@ get_auth_salt(_Post, undefined )->
 get_auth_salt(Post, SaltL )->
     Salt = list_to_binary(SaltL),
     CalcSalt  = list_to_binary( api_auth_demon:hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
-    <<"&auth=", CalcSalt/binary>>
+    CalcSalt/binary
 .
 
          
@@ -493,9 +493,10 @@ api_callback(unexpected_error, Session, _Context,  ProtoType, CallBackUrl, Salt 
                 [_| Params]     = tuple_to_list(ProtoType),
                 
                 VarsRes = lists:map( fun api_var_match/1, Params ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, unexpected_error}, {result, VarsRes}]),                
-                AuthSalt =  get_auth_salt(PrePost, Salt),
-                Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
+                PrePost  = cowboy_http:urlencode( jsx:encode( [ { session, list_to_binary(Session) }, 
+                                                 {status, unexpected_error}, {result, VarsRes}]) ),                
+                AuthSalt = cowboy_http:urlencode( get_auth_salt(PrePost, Salt) ),
+                Post = <<"params=",PrePost/binary, "&auth=", AuthSalt/binary>>,
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -521,9 +522,11 @@ api_callback(unexpected_error, Session, _Context,  ProtoType, CallBackUrl, Salt 
 api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
-                AuthSalt =  get_auth_salt(PrePost, Salt),
-                Post = cowboy_http:urlencode(<<"params=",PrePost/binary, AuthSalt/binary>>),
+                PrePost  = cowboy_http:urlencode( jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]) ),
+                AuthSalt = cowboy_http:urlencode( get_auth_salt(PrePost, Salt) ),
+                
+                Post = <<"params=",PrePost/binary, "&auth=", AuthSalt/binary>>,
+                
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
                             [{?MODULE,?LINE}, AuthSalt ]),
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
@@ -557,10 +560,11 @@ api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
                 [_| Params]  = tuple_to_list(Res),
                 VarsRes  = lists:map( fun api_callback_process_params/1, Params ),
                 VarsList = lists:map(fun api_var_match_vars/1, dict:to_list(Context) ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} | VarsList]),
-%                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} ]),
-                AuthSalt =  get_auth_salt(PrePost, Salt),
-                Post = cowboy_http:urlencode(<<"params=",PrePost/binary, AuthSalt/binary>>),
+                PrePost  = cowboy_http:urlencode( jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} | VarsList]) ),
+                AuthSalt =  cowboy_http:urlencode( get_auth_salt(PrePost, Salt) ),
+                
+                Post = <<"params=",PrePost/binary, "&auth=", AuthSalt/binary>>,
+                
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
                             [{?MODULE,?LINE}, AuthSalt ]),
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
