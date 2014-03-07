@@ -524,9 +524,10 @@ api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-                ?WEB_REQS("~p generated post callback  ~p ~n params ~p~n",
-                            [{?MODULE,?LINE}, Post, {Salt, PrePost} ]),
-
+                ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
+                            [{?MODULE,?LINE}, Post ]),
+                ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
+                            [{?MODULE,?LINE}, {Salt, PrePost} ]),
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -558,8 +559,10 @@ api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
 %                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} ]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
-                ?WEB_REQS("~p generated post callback   ~p ~n params ~p~n",
-                          [{?MODULE,?LINE}, Post, {Salt, PrePost} ]),
+                ?WEB_REQS("~p generated post callback   ~p ~n params~n",
+                          [{?MODULE,?LINE}, Post ]),
+               ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
+                            [{?MODULE,?LINE}, {Salt, PrePost} ]),          
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
