@@ -486,7 +486,8 @@ get_auth_salt(Post, SaltL )->
     CalcSalt  = list_to_binary( api_auth_demon:hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
     <<"&auth=", CalcSalt/binary>>
 .
-          
+
+         
     
 api_callback(unexpected_error, Session, _Context,  ProtoType, CallBackUrl, Salt )->    
                 [_| Params]     = tuple_to_list(ProtoType),
@@ -523,6 +524,9 @@ api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
+                ?WEB_REQS("~p generated post callback  ~p ~n params ~p~n",
+                            [{?MODULE,?LINE}, Post, {Salt, PrePost} ]),
+
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -554,6 +558,8 @@ api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
 %                 PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} ]),
                 AuthSalt =  get_auth_salt(PrePost, Salt),
                 Post = <<"params=",PrePost/binary, AuthSalt/binary>>,
+                ?WEB_REQS("~p generated post callback   ~p ~n params ~p~n",
+                          [{?MODULE,?LINE}, Post, {Salt, PrePost} ]),
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
