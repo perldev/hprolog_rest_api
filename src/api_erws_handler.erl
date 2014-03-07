@@ -529,7 +529,7 @@ api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
                             [{?MODULE,?LINE}, PrePost ]),
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
-                            [{?MODULE,?LINE}, Salt ]),
+                            [{?MODULE,?LINE}, Post ]),
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
@@ -566,7 +566,7 @@ api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
                             [{?MODULE,?LINE}, PrePost ]),
                 ?WEB_REQS("~p generated post callback  ~p ~n params ~n",
-                            [{?MODULE,?LINE}, Salt ]),         
+                            [{?MODULE,?LINE}, Post ]),         
                 case catch  httpc:request( post, { binary_to_list(CallBackUrl),
                                     [   {"Content-Length", integer_to_list( erlang:byte_size(Post) )},
                                         {"Accept","application/json"}
