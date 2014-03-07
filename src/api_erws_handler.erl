@@ -484,7 +484,7 @@ get_auth_salt(_Post, undefined )->
 get_auth_salt(Post, SaltL )->
     Salt = list_to_binary(SaltL),
     CalcSalt  = list_to_binary( api_auth_demon:hexstring( crypto:hash(sha512, <<Post/binary, Salt/binary>>) ) ) ,
-    CalcSalt/binary
+    CalcSalt
 .
 
          
