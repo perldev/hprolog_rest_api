@@ -626,9 +626,9 @@ process_json_params("null")->
 process_json_params(null)->
        "";    
 process_json_params(E) when is_float(E)->
-       float_to_list(E); 
+       E; 
 process_json_params(E) when is_integer(E)->
-       integer_to_list(E);    
+       E;    
 process_json_params(E) when is_list(E)->
        proc_object(E);
 process_json_params(E) when is_binary(E)->
