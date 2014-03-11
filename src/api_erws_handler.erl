@@ -113,7 +113,7 @@ start_once_aim(Msg, NameSpace, CallBackUrl, _BackPid, _ConfigNameSpace)->
         ResultOfStart = start_link_session_sup(NewSession, Msg, NameSpace, CallBackUrl, Salt, once),
         ?WEB_REQS("~n~p start  aim  under supervisor ~p~n",[{?MODULE,?LINE}, ResultOfStart  ]),
         send_msg_to_process(NewSession, Msg),
-        jsx:encode([{status,<<"true">>}, {session, list_to_binary(NewSession)}]).
+        jsx:encode([{status, true}, {session, list_to_binary(NewSession)}]).
         
         
         
@@ -523,7 +523,7 @@ api_callback(unexpected_error, Session, _Context,  ProtoType, CallBackUrl, Salt 
 api_callback(false, Session, _Context,   ProtoType, CallBackUrl, Salt)->
                 [_| Params]     = tuple_to_list(ProtoType),
                 VarsRes = lists:map( fun api_callback_process_params/1, Params ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, <<"false">>}, {result, VarsRes}]),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, false}, {result, VarsRes}]),
                 EncPost  = cowboy_http:urlencode(PrePost),
                 AuthSalt = cowboy_http:urlencode( get_auth_salt(PrePost, Salt) ),
                 
@@ -562,7 +562,7 @@ api_callback(Res, Session, Context,   _ProtoType, CallBackUrl, Salt)->
                 [_| Params]  = tuple_to_list(Res),
                 VarsRes  = lists:map( fun api_callback_process_params/1, Params ),
                 VarsList = lists:map(fun api_var_match_vars/1, dict:to_list(Context) ),
-                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, <<"true">>}, {result, VarsRes} | VarsList]),
+                PrePost  = jsx:encode( [ { session, list_to_binary(Session) } ,{status, true}, {result, VarsRes} | VarsList]),
                 EncPost  = cowboy_http:urlencode(PrePost),
                 AuthSalt =  cowboy_http:urlencode( get_auth_salt(PrePost, Salt) ),
                 
