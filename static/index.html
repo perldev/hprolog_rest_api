@@ -70,8 +70,8 @@
             <a href="#" id="button" data-button="off" class="btn btn-danger regbtn">Off</a>
             </div>
             <ul class="nav">
-              <li><a href="#" data-page="graph">Logic Level</a></li>
-              <li><a href="#" data-page="monitor">Technical Level</a></li>
+              <li><a href="#" data-page="graph">Логический уровень</a></li>
+              <li><a href="#" data-page="monitor">Технический</a></li>
             </ul>
           </div><!--/.nav-collapse -->
         </div>
@@ -87,6 +87,7 @@
               <li class="nav-header">Показатели Статистики</li>
               <li class="active"><a id="requests" href="#" data-page="sidebar">Запросы в работе</a></li>
               <li><a href="#" id="system_state" data-page="sidebar">Состояние cистемы</a></li>
+              <li><a href="#" id="graph" data-page="sidebar">Факты</a></li>
               <li><a href="#" id="code_memory" data-page="sidebar">Код ядра</a></li>
               <!--<li><a href="#">Link</a></li> -->
             </ul>
@@ -133,9 +134,9 @@
       google.load("visualization", "1", {packages:["corechart"]});
       
         $(document).ready(function() {
-                    
+        var HOST = "ws://app-oracul-1.ceb.loc:8080/monitor_websocket";            
         // need change host
-        vm_statistic.ws = new WebSocket("ws://hd-test-2.ceb.loc:8313/websocket");
+        vm_statistic.ws = new WebSocket(HOST);
 
         // vm_statistic.ws = new WebSocket("ws://localhost:8313/websocket");
         vm_statistic.ws.onopen = function(evt){
@@ -152,7 +153,7 @@
 
             
             
-            $('a').on('click', vm_statistic.events.pageChange);
+//             $('a').on('click', vm_statistic.events.pageChange);
             $("a[id='button']").on('click', vm_statistic.events.buttonChange);
             
             

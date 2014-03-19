@@ -26,7 +26,8 @@
             get_dict_default/2,
             update_config/3,
             delete_config/2,
-            get_namespaces/1
+            get_namespaces/1,
+            move2hbase/1
             ]
        ).
 
@@ -145,7 +146,23 @@ load_backup(?ETS_PUBLIC_SYSTEMS, Application)->
      {ok, REGISTERED_NAMESPACE} = application:get_env(Application, ?ETS_PUBLIC_SYSTEMS_BACKUP),
      {ok, Tab} = ets:file2tab(REGISTERED_NAMESPACE),
      Tab.
-         
+
+     
+move2hbase(NameSpace)->
+        {Name, OutId, Config}  = get_name_space_info(NameSpace),
+        {ok, FileSouce}  = dict:find(source, Config),
+        case FileSouce of
+                hbase -> throw({already_in_hbase, NameSpace});
+                {file, Path} ->
+                        %%Attention !!!
+                        %%%all data except   const  rules in file  will be deleted 
+                        prolog:delete_inner_structs(NameSpace),
+                        ok = prolog:load_database_file(Path, NameSpace),
+                        prolog:memory2hbase(NameSpace, NameSpace),             
+                        ets:insert(?ETS_PUBLIC_SYSTEMS,{Name, OutId, dict:store(source, hbase, Config) )
+        end                
+.
+     
         
 
 code_change(_OldVsn, State, _Extra) ->
@@ -275,18 +292,19 @@ handle_cast({load_auth_info, Application }, State)->
         case application:get_env(Application, auth_list) of
                {ok, AuthList} ->
                     ets:insert(api_auth_info, AuthList),
-                    ?MODULE:fill_config4public()
-                    ;
+                    ?MODULE:fill_config4public();
                _ ->
                     ets:insert(api_auth_info, [])
         end,
+        %%add processing mistakes
         Loaded =  ets:foldl(fun({ NameSpaceName, _, Config  }, In) ->  
                         case dict:find(source, Config) of
                                     {ok, {file, Path} }->
-                                             ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
-                                             ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
-                                             ResCreateTab = (catch ets:file2tab(Path)),
-                                             ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
+                                             spawn(prolog, load_database_file, [Path, NameSpaceName]);
+%                                               ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
+%                                              ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
+%                                              ResCreateTab = (catch ets:file2tab(Path)),
+%                                              ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
                                     {ok, hbase}->
                                              ?LOG_DEBUG("load namespace from hbase  ~n",[]),
                                              spawn(prolog_shell, api_start, [NameSpaceName] );
@@ -296,7 +314,7 @@ handle_cast({load_auth_info, Application }, State)->
                         ets:insert(NameSpace, {NameSpaceName, now()}),
                         [NameSpaceName|In]
                     end,[], ?ETS_PUBLIC_SYSTEMS),
-       ?LOG_DEBUG("~p list of load namespaces  ~p ~n",[{?MODULE,?LINE}, Loaded ]),
+        ?LOG_DEBUG("~p list of load namespaces  ~p ~n",[{?MODULE,?LINE}, Loaded ]),
         {ok, REGISTERED_FILE} = application:get_env(Application, registered_file),
         {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespace),
         {ok, ETS_PUBLIC_SYSTEMS_DETS} = application:get_env(Application, ets_public_systems_dets),
@@ -501,8 +519,7 @@ one_expired(Body  = #api_record{id = Session,aim_pid =  Pid, start_time = StartT
 
 check_expired_key('$end_of_table', _Fun,  _Table, _E, _ )->
     finish;
-check_expired_key(Key, Fun, Table, ExpiredMiliSeconds, Now)->
-    
+check_expired_key(Key, Fun, Table, ExpiredMiliSeconds, Now)->   
    case  catch ets:lookup(Table, Key) of
         [ Value ] ->
             NewKey = Fun(Value, Table, Key, ExpiredMiliSeconds, Now),

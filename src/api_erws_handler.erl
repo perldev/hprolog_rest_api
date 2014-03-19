@@ -78,8 +78,8 @@ start_link_session(Session, SourceMsg, NameSpace, CallBackUrl, Salt, Type) ->
     
     {ok, Pid}.
     
-start_once_aim(Msg, NameSpace, CallBack ,ConfigNameSpace)->
-    start_once_aim(Msg, NameSpace, CallBack, self() ,ConfigNameSpace).    
+start_once_aim(Msg, NameSpace, CallBack, ConfigNameSpace)->
+    start_once_aim(Msg, NameSpace, CallBack, self(), ConfigNameSpace).    
     
 start_once_aim({error, Description}, _NameSpace,_,_, _ConfigNameSpace)->
     Binary = list_to_binary( lists:flatten( io_lib:format("~p", Description) ) ) , 
