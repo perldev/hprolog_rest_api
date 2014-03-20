@@ -156,7 +156,7 @@ move2hbase(NameSpace)->
                 {file, Path} ->
                         %%Attention !!!
                         %%%all data except   const  rules in file  will be deleted 
-                        prolog:save_database_file(Name, Path),
+%                         prolog:save_database_file(Name, Path),
                         prolog:delete_structs(NameSpace),
                         prolog:load_database_file(Path, NameSpace),
                         prolog:memory2hbase(NameSpace, NameSpace),             
