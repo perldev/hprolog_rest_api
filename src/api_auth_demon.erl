@@ -4,6 +4,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([start_link/0,start_link/1, stop/0, status/0, regis_timer_restart/1, regis/2 ,regis/1, 
          kill_process_after/1, get_api_salt/1, get_api_timeout/1 ]).
+         
 -export([   auth/2, 
             deauth/2, 
             low_auth/3, 
