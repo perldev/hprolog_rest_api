@@ -156,7 +156,7 @@ move2hbase(NameSpace)->
                 {file, Path} ->
                         %%Attention !!!
                         %%%all data except   const  rules in file  will be deleted 
-                        prolog:delete_inner_structs(NameSpace),
+                        prolog:delete_structs(NameSpace),
                         prolog:load_database_file(Path, NameSpace),
                         prolog:memory2hbase(NameSpace, NameSpace),             
                         ets:insert(?ETS_PUBLIC_SYSTEMS,{Name, OutId, dict:store(source, hbase, Config) } )
