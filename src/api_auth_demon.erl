@@ -157,9 +157,9 @@ move2hbase(NameSpace)->
                         %%Attention !!!
                         %%%all data except   const  rules in file  will be deleted 
                         prolog:delete_inner_structs(NameSpace),
-                        ok = prolog:load_database_file(Path, NameSpace),
+                        prolog:load_database_file(Path, NameSpace),
                         prolog:memory2hbase(NameSpace, NameSpace),             
-                        ets:insert(?ETS_PUBLIC_SYSTEMS,{Name, OutId, dict:store(source, hbase, Config) )
+                        ets:insert(?ETS_PUBLIC_SYSTEMS,{Name, OutId, dict:store(source, hbase, Config) } )
         end                
 .
      
@@ -301,10 +301,6 @@ handle_cast({load_auth_info, Application }, State)->
                         case dict:find(source, Config) of
                                     {ok, {file, Path} }->
                                              spawn(prolog, load_database_file, [Path, NameSpaceName]);
-%                                               ResCreate = (catch prolog:create_inner_structs( NameSpaceName ) ),
-%                                              ResDel = (catch ets:delete(common:get_logical_name( NameSpaceName, ?RULES) ) ),
-%                                              ResCreateTab = (catch ets:file2tab(Path)),
-%                                              ?LOG_DEBUG("load namespace from file ~p is ~p ~n",[Path, {ResDel, ResCreate, ResCreateTab }]);
                                     {ok, hbase}->
                                              ?LOG_DEBUG("load namespace from hbase  ~n",[]),
                                              spawn(prolog_shell, api_start, [NameSpaceName] );
