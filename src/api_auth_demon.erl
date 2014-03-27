@@ -60,8 +60,7 @@ init([Application]) ->
         {ok, #monitor {
                         application = Application,
                         auth_info = Auth,
-                        proc_table = ets:new( proc_table, [named_table ,public ,set] 
-        )}}.
+                        proc_table = ets:new( proc_table, [named_table ,public ,set] ) }}.
 
 load_auth_info(Application)->
         gen_server:cast(?MODULE, {load_auth_info, Application }).
@@ -135,16 +134,28 @@ load_tables(Application)->
 
 load_backup(registered_ip, Application)->
      {ok, REGISTERED_FILE} = application:get_env(Application, registered_ip_backup),
-     {ok, Tab} =  ets:file2tab(REGISTERED_FILE),
-     Tab;
+     case catch ets:file2tab(REGISTERED_FILE) of
+	  {ok, Tab} ->  Tab;
+	  _ -> 
+	     ?WEB_REQS("~n~p can't load table ~p, and create new ~n",[{?MODULE,?LINE}, registered_ip  ]),
+	     ets:new(registered_ip, [named_table ,public ,set])
+     end;
 load_backup(registered_namespaces, Application)->
      {ok, REGISTERED_NAMESPACE} = application:get_env(Application, registered_namespaces_backup),
-     {ok,Tab} = ets:file2tab(REGISTERED_NAMESPACE),
-     Tab;
+     case catch ets:file2tab(REGISTERED_NAMESPACE) of
+	  {ok, Tab} ->  Tab;
+	  _ -> 
+	     ?WEB_REQS("~n~p can't load table ~p, and create new ~n",[{?MODULE,?LINE}, registered_namespaces  ]),
+	     ets:new(registered_namespaces, [named_table ,public ,set])
+     end;
 load_backup(?ETS_PUBLIC_SYSTEMS, Application)->
      {ok, REGISTERED_NAMESPACE} = application:get_env(Application, ?ETS_PUBLIC_SYSTEMS_BACKUP),
-     {ok, Tab} = ets:file2tab(REGISTERED_NAMESPACE),
-     Tab.
+     case  catch ets:file2tab(REGISTERED_NAMESPACE) of
+	  {ok, Tab} ->  Tab;
+	  _->
+	     ?WEB_REQS("~n~p can't load table ~p, and create new ~n",[{?MODULE,?LINE}, ?ETS_PUBLIC_SYSTEMS  ]),
+	     ets:new(?ETS_PUBLIC_SYSTEMS, [named_table ,public ,set])
+     end.
          
         
 
